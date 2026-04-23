@@ -41,7 +41,13 @@ export default function MainLayout({
       router.push("/auth/login");
     }
   }, [user, isLoading, router]);
-
+  function slugify(text: string) {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
   useEffect(() => {
     const onTaskPagesUpdated = () => {
       setTaskPages(readTaskNavPages());
@@ -60,8 +66,13 @@ export default function MainLayout({
 
   const createTaskPage = (generatedTasks: Task[] = [], pageName?: string) => {
     const nextIndex = taskPages.length + 1;
-    const id = `page-${Date.now()}`;
     const finalName = pageName?.trim() || `Task Page ${nextIndex}`;
+    const slug = slugify(finalName);
+
+    // short id (6 chars)
+    const shortId = Math.random().toString(36).substring(2, 8);
+
+    const id = `${slug}-${shortId}`;
     const newPage = { id, name: finalName };
     const updated = [...taskPages, newPage];
     setTaskPages(updated);
