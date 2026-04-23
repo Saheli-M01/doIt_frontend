@@ -1,18 +1,82 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useUser } from "../context/UserContext";
+import { ThemeToggle } from "@/app/components/ThemeToggle";
+import { ThemedLogo } from "@/app/components/ThemedLogo";
+import { LayoutDashboard, ListTodo, LogOut, Plus, Trash2 } from "lucide-react";
 
-export default function MainLayout({ children }: { children: React.ReactNode }) {
+type TaskNavPage = {
+  id: string;
+  name: string;
+};
+
+const TASK_NAV_PAGES_KEY = "task-nav-pages";
+
+const readTaskNavPages = (): TaskNavPage[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(TASK_NAV_PAGES_KEY);
+    return stored ? (JSON.parse(stored) as TaskNavPage[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+export default function MainLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, setUser, isLoading } = useUser();
+  const [taskPages, setTaskPages] = useState<TaskNavPage[]>(readTaskNavPages);
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/auth/login");
     }
   }, [user, isLoading, router]);
+
+  useEffect(() => {
+    const onTaskPagesUpdated = () => {
+      setTaskPages(readTaskNavPages());
+    };
+
+    window.addEventListener("task-pages-updated", onTaskPagesUpdated);
+    return () => {
+      window.removeEventListener("task-pages-updated", onTaskPagesUpdated);
+    };
+  }, []);
+
+  const persistTaskPages = (pages: TaskNavPage[]) => {
+    localStorage.setItem(TASK_NAV_PAGES_KEY, JSON.stringify(pages));
+    window.dispatchEvent(new Event("task-pages-updated"));
+  };
+
+  const createTaskPage = () => {
+    const nextIndex = taskPages.length + 1;
+    const id = `page-${Date.now()}`;
+    const newPage = { id, name: `Task Page ${nextIndex}` };
+    const updated = [...taskPages, newPage];
+    setTaskPages(updated);
+    persistTaskPages(updated);
+    router.push(`/tasks/${id}`);
+  };
+
+  const deleteTaskPage = (pageId: string) => {
+    const updated = taskPages.filter((page) => page.id !== pageId);
+    setTaskPages(updated);
+    persistTaskPages(updated);
+    if (pathname === `/tasks/${pageId}`) {
+      router.push("/tasks");
+    }
+  };
+
+  const isTasksActive = pathname.startsWith("/tasks");
+  const isDashboardActive = pathname === "/dashboard";
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -22,8 +86,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   if (isLoading || !user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-lg">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-foreground text-lg">Loading...</div>
       </div>
     );
   }
@@ -31,35 +95,89 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <div className="w-60 bg-gray-900 text-white p-4 flex flex-col gap-4">
-        <h1 className="text-xl font-bold mb-4">DoIt</h1>
+      <aside className="w-60 bg-surface border-r border-border text-foreground p-4 flex flex-col gap-2">
+        {/* Logo + toggle row */}
+        <div className="flex items-center justify-between mb-4">
+          <ThemedLogo />
+          <ThemeToggle />
+        </div>
 
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="text-left px-4 py-2 rounded hover:bg-gray-800 transition-colors"
-        >
-          Dashboard
-        </button>
+        <nav className="flex flex-col gap-1 flex-1">
+          <button
+            onClick={() => router.push("/dashboard")}
+            className={`cursor-pointer text-left px-4 py-2 rounded transition-colors text-foreground flex items-center gap-2 ${
+              isDashboardActive ? "bg-muted" : "hover:bg-muted"
+            }`}
+          >
+            <LayoutDashboard size={18} />
+            Dashboard
+          </button>
 
-        <button
-          onClick={() => router.push("/tasks")}
-          className="text-left px-4 py-2 rounded hover:bg-gray-800 transition-colors"
-        >
-          Tasks
-        </button>
+          <div className="flex flex-col gap-1">
+            <div
+              className={`px-2 py-1 rounded transition-colors ${
+                isTasksActive ? "bg-muted" : "hover:bg-muted"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <div className="text-left px-2 py-1 rounded text-foreground flex items-center gap-2 flex-1">
+                  <ListTodo size={18} />
+                  Tasks
+                </div>
+                <button
+                  onClick={createTaskPage}
+                  className="cursor-pointer p-1 rounded text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
+                  aria-label="Create task page"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+
+            {taskPages.length > 0 && (
+              <div className="ml-7 mr-1 mt-1 space-y-1">
+                {taskPages.map((page) => (
+                  <div
+                    key={page.id}
+                    className={`group flex items-center justify-between rounded px-2 py-1 ${
+                      pathname === `/tasks/${page.id}`
+                        ? "bg-muted"
+                        : "hover:bg-muted/60"
+                    }`}
+                  >
+                    <button
+                      onClick={() => router.push(`/tasks/${page.id}`)}
+                      className="text-sm text-left text-foreground-muted hover:text-foreground truncate flex-1"
+                    >
+                      {page.name}
+                    </button>
+                    <button
+                      onClick={() => deleteTaskPage(page.id)}
+                      className="p-1 rounded text-error/80 hover:text-error hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                      aria-label={`Delete ${page.name}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </nav>
 
         <button
           onClick={handleLogout}
-          className="mt-auto px-4 py-2 rounded text-red-400 hover:bg-gray-800 transition-colors"
+          className="px-4 py-2 rounded text-error hover:bg-muted transition-colors text-left flex items-center gap-2"
         >
+          <LogOut size={18} />
           Logout
         </button>
-      </div>
+      </aside>
 
       {/* Main Content */}
-      <div className="flex-1 p-6 bg-gray-100">
+      <main className="flex-1 p-6 bg-background text-foreground">
         {children}
-      </div>
+      </main>
     </div>
   );
 }
