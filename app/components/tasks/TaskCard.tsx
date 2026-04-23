@@ -1,6 +1,16 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Circle, Flag, Pencil, Plus, Save, X } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Circle,
+  Flag,
+  Pencil,
+  Plus,
+  Save,
+  X,
+} from "lucide-react";
+
 import { PRIORITY_CONFIG, type Task } from "./types";
 import { formatDisplayDate } from "./grouping";
 import { Button, Input } from "./ui";
@@ -8,12 +18,35 @@ import { DatePicker } from "./DatePicker";
 import { Dropdown, type DropdownOption } from "./Dropdown";
 
 const PRIORITY_OPTIONS: DropdownOption[] = [
-  { value: "low", label: "Low", color: "var(--color-success)" },
-  { value: "medium", label: "Medium", color: "var(--color-warning)" },
-  { value: "high", label: "High", color: "var(--color-error)" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
 ];
 
-export interface TaskCardProps {
+const PRIORITY_STYLES = {
+  low: "border-l-[4px] border-l-green-500",
+  medium: "border-l-[4px] border-l-yellow-500",
+  high: "border-l-[4px] border-l-red-500",
+};
+
+export function TaskCard({
+  task,
+  editingId,
+  editText,
+  editDate,
+  editPriority,
+  isSelected,
+  onToggle,
+  onDelete,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onOpenDetails,
+  onSelect,
+  setEditText,
+  setEditDate,
+  setEditPriority,
+}: {
   task: Task;
   editingId: number | null;
   editText: string;
@@ -30,148 +63,116 @@ export interface TaskCardProps {
   setEditText: (v: string) => void;
   setEditDate: (v: string) => void;
   setEditPriority: (v: Task["priority"]) => void;
-}
-
-export function TaskCard({
-  task, editingId, editText, editDate, editPriority,
-  isSelected, onToggle, onDelete, onStartEdit, onSaveEdit,
-  onCancelEdit, onOpenDetails, onSelect,
-  setEditText, setEditDate, setEditPriority,
-}: TaskCardProps) {
+}) {
   const pc = PRIORITY_CONFIG[task.priority];
   const isEditing = editingId === task.id;
 
   return (
     <div
-      style={{
-        background: isSelected
-          ? "color-mix(in srgb, var(--color-primary) 8%, var(--color-surface))"
-          : "var(--color-surface)",
-        border: isSelected
-          ? "1.5px solid color-mix(in srgb, var(--color-primary) 50%, transparent)"
-          : "1.5px solid var(--color-border)",
-        borderLeft: `4px solid ${pc.color}`,
-        borderRadius: 12,
-        padding: "14px 16px",
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 12,
-        transition: "all 0.2s ease",
-        opacity: task.completed ? 0.65 : 1,
-      }}
+      className={`
+        flex gap-3 p-4 rounded-xl border transition-all
+        ${PRIORITY_STYLES[task.priority]}
+        ${isSelected ? "border-primary bg-primary/10" : "border-border bg-surface"}
+        ${task.completed ? "opacity-60" : ""}
+      `}
     >
-      {/* Selection box */}
+      {/* Select */}
       {onSelect && (
         <button
           onClick={onSelect}
-          aria-label={isSelected ? "Deselect task" : "Select task"}
-          style={{
-            width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 3,
-            border: isSelected
-              ? "2px solid var(--color-primary)"
-              : "2px solid var(--color-border)",
-            background: isSelected ? "var(--color-primary)" : "transparent",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", transition: "all 0.15s ease",
-          }}
+          className={`
+            w-4 h-4 mt-1 rounded flex items-center justify-center border-2 transition
+            ${
+              isSelected
+                ? "bg-primary border-primary text-white"
+                : "border-border"
+            }
+          `}
         >
-          {isSelected && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1 }}>✓</span>}
+          {isSelected && <span className="text-[10px]">✓</span>}
         </button>
       )}
 
-      {/* Completion toggle */}
+      {/* Toggle */}
       <button
         onClick={() => onToggle(task)}
-        aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
-        style={{
-          flexShrink: 0, marginTop: 2, background: "none", border: "none",
-          cursor: "pointer",
-          color: task.completed ? "var(--color-success)" : "var(--color-foreground-muted)",
-          transition: "color 0.2s ease",
-        }}
+        className="mt-1 text-muted-foreground hover:text-green-500 transition"
       >
-        {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+        {task.completed ? (
+          <CheckCircle2 size={20} className="text-green-500" />
+        ) : (
+          <Circle size={20} />
+        )}
       </button>
 
       {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex-1 min-w-0">
         {isEditing ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="flex flex-col gap-2">
             <Input
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
               autoFocus
               placeholder="Task name"
-              style={{ width: "100%" }}
             />
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+
+            <div className="flex flex-wrap gap-2">
               <DatePicker
                 value={editDate}
                 onChange={setEditDate}
                 placeholder="dd-mm-yyyy"
               />
+
               <Dropdown
                 value={editPriority}
                 options={PRIORITY_OPTIONS}
-                onChange={(next) => setEditPriority(next as Task["priority"])}
-                style={{ minWidth: 132 }}
+                onChange={(v) => setEditPriority(v as Task["priority"])}
               />
+
               <Button onClick={() => onSaveEdit(task)}>
-                <Save size={13} /> Save
+                <Save size={14} /> Save
               </Button>
-              <Button variant="ghost" onClick={onCancelEdit}>Cancel</Button>
+
+              <Button variant="ghost" onClick={onCancelEdit}>
+                Cancel
+              </Button>
             </div>
           </div>
         ) : (
           <>
-            <p style={{
-              fontWeight: 600, fontSize: 15, marginBottom: 8, wordBreak: "break-word",
-              color: task.completed ? "var(--color-foreground-muted)" : "var(--color-foreground)",
-              textDecoration: task.completed ? "line-through" : "none",
-            }}>
+            <p
+              className={`
+                font-semibold text-sm mb-2 break-words
+                ${task.completed ? "line-through text-muted-foreground" : ""}
+              `}
+            >
               {task.title}
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {/* Priority badge */}
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600,
-                background: pc.bg, color: pc.color, padding: "3px 10px", borderRadius: 20,
-                border: `1px solid color-mix(in srgb, ${pc.color} 30%, transparent)`,
-              }}>
-                <Flag size={11} /> {pc.label}
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Priority */}
+              <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border bg-muted text-foreground">
+                <Flag size={11} /> {pc?.label}
               </span>
-              {/* Date badge */}
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11,
-                background: "var(--color-muted)", color: "var(--color-foreground-muted)",
-                padding: "3px 10px", borderRadius: 20,
-                border: "1px solid var(--color-border)",
-              }}>
-                <CalendarDays size={11} /> {formatDisplayDate(task.date)}
+
+              {/* Date */}
+              <span className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border bg-muted text-muted-foreground">
+                <CalendarDays size={11} />
+                {formatDisplayDate(task.date)}
               </span>
+
               {/* Edit */}
               <button
                 onClick={() => onStartEdit(task)}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600,
-                  color: "var(--color-primary)",
-                  background: "color-mix(in srgb, var(--color-primary) 10%, transparent)",
-                  border: "1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)",
-                  padding: "3px 10px", borderRadius: 20, cursor: "pointer",
-                }}
+                className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border text-primary bg-primary/10 border-primary/30"
               >
                 <Pencil size={11} /> Edit
               </button>
+
               {/* Details */}
               <button
                 onClick={() => onOpenDetails(task.id)}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600,
-                  color: "var(--color-primary-light)",
-                  background: "color-mix(in srgb, var(--color-primary-light) 10%, transparent)",
-                  border: "1px solid color-mix(in srgb, var(--color-primary-light) 25%, transparent)",
-                  padding: "3px 10px", borderRadius: 20, cursor: "pointer",
-                }}
+                className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border text-primary-light bg-primary-light/10 border-primary-light/30"
               >
                 <Plus size={11} /> Details
               </button>
@@ -183,25 +184,7 @@ export function TaskCard({
       {/* Delete */}
       <button
         onClick={() => onDelete(task.id)}
-        aria-label="Delete task"
-        style={{
-          flexShrink: 0,
-          background: "color-mix(in srgb, var(--color-error) 8%, transparent)",
-          border: "1px solid color-mix(in srgb, var(--color-error) 20%, transparent)",
-          color: "var(--color-error)",
-          borderRadius: 8, padding: 6, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "all 0.2s ease",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "var(--color-error)";
-          (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background =
-            "color-mix(in srgb, var(--color-error) 8%, transparent)";
-          (e.currentTarget as HTMLButtonElement).style.color = "var(--color-error)";
-        }}
+        className="p-1.5 rounded-md border border-red-300 text-red-500 hover:bg-red-500 hover:text-white transition"
       >
         <X size={16} />
       </button>

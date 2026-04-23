@@ -3,10 +3,11 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "../context/UserContext";
-import AIChat from "@/app/components/AIChat";
+import AIChat from "@/app/components/AIChat/AIChat";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { LayoutDashboard, ListTodo, LogOut, Plus, Trash2 } from "lucide-react";
+import type { Task } from "@/app/components/tasks/types";
 
 type TaskNavPage = {
   id: string;
@@ -57,13 +58,16 @@ export default function MainLayout({
     window.dispatchEvent(new Event("task-pages-updated"));
   };
 
-  const createTaskPage = () => {
+  const createTaskPage = (generatedTasks: Task[] = []) => {
     const nextIndex = taskPages.length + 1;
     const id = `page-${Date.now()}`;
     const newPage = { id, name: `Task Page ${nextIndex}` };
     const updated = [...taskPages, newPage];
     setTaskPages(updated);
     persistTaskPages(updated);
+    if (generatedTasks.length > 0) {
+      localStorage.setItem(`task-items-${id}`, JSON.stringify(generatedTasks));
+    }
     router.push(`/tasks/${id}`);
   };
 
@@ -166,8 +170,12 @@ export default function MainLayout({
           </div>
         </nav>
 
-        <div className="pb-2">
-          <AIChat userId={user.id} mode="sidebar" />
+        <div className="pb-2 ">
+          <AIChat
+            userId={user.id}
+            mode="sidebar"
+            onCreateTaskPage={createTaskPage}
+          />
         </div>
 
         <button
