@@ -14,16 +14,23 @@ import PromptInput from "./PromptInput";
 import TaskList from "./TasksList";
 import Actions from "./Actions";
 
+const MAX_USAGE = 5;
+
 type GeneratedTask = {
   title: string;
   priority: "low" | "medium" | "high";
   date: string;
 };
 
+type PlanResponse = {
+  title?: string;
+  tasks?: Array<Partial<GeneratedTask>>;
+};
+
 type AIChatProps = {
   userId: string;
-  onAddTasks?: (tasks: GeneratedTask[]) => void;
-  onCreateTaskPage?: (tasks: GeneratedTask[]) => void;
+  onAddTasks?: (data: { title: string; tasks: GeneratedTask[] }) => void;
+  onCreateTaskPage?: (data: { title: string; tasks: GeneratedTask[] }) => void;
   mode?: "floating" | "sidebar";
 };
 
@@ -37,11 +44,30 @@ export default function AIChat({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [aiTasks, setAiTasks] = useState<GeneratedTask[]>([]);
-  const [usageCount] = useState(0);
+  const [usageCount, setUsageCount] = useState(0);
   const [converted, setConverted] = useState(false);
+  const [usageWarning, setUsageWarning] = useState("");
+  const [planTitle, setPlanTitle] = useState("");
+
+  const isUsageLimitReached = usageCount >= MAX_USAGE;
+
+  const handleOpenPlanner = () => {
+    if (isUsageLimitReached) {
+      setUsageWarning(
+        "Usage limit reached (5/5). You can't access AI planning now.",
+      );
+    }
+    setOpen(true);
+  };
 
   const generatePlan = async () => {
     setConverted(false);
+    if (isUsageLimitReached) {
+      setUsageWarning(
+        "Usage limit reached (5/5). You can't access AI planning now.",
+      );
+      return;
+    }
     if (!prompt.trim()) return;
     setLoading(true);
 
@@ -52,7 +78,7 @@ export default function AIChat({
     });
 
     const text = await res.text();
-    let data;
+    let data: unknown;
     try {
       data = JSON.parse(text);
     } catch {
@@ -61,22 +87,56 @@ export default function AIChat({
       return;
     }
 
-    setAiTasks(data);
+    const parsed = data as PlanResponse | Array<Partial<GeneratedTask>>;
+    const rawTasks = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.tasks)
+        ? parsed.tasks
+        : [];
+
+    const normalizedTasks: GeneratedTask[] = rawTasks
+      .filter((task): task is Partial<GeneratedTask> => Boolean(task?.title))
+      .map((task) => {
+        const priority =
+          task.priority === "high" ||
+          task.priority === "medium" ||
+          task.priority === "low"
+            ? task.priority
+            : "medium";
+
+        return {
+          title: String(task.title ?? "").trim(),
+          priority,
+          date: task.date ?? "",
+        };
+      })
+      .filter((task) => task.title.length > 0);
+
+    setPlanTitle(Array.isArray(parsed) ? "" : (parsed.title ?? ""));
+    setAiTasks(normalizedTasks);
+    const nextUsage = Math.min(MAX_USAGE, usageCount + 1);
+    setUsageCount(nextUsage);
+    if (nextUsage >= MAX_USAGE) {
+      setUsageWarning(
+        "Usage limit reached (5/5). You can't access AI planning now.",
+      );
+    } else {
+      setUsageWarning("");
+    }
     setLoading(false);
   };
 
   const convertToTasks = () => {
-    const tasks = aiTasks.map((t, i) => ({
-      id: Date.now() + i,
-      title: t.title,
-      completed: false,
-      date: t.date,
-      priority: t.priority,
-    }));
     if (onAddTasks) {
-      onAddTasks(tasks);
+      onAddTasks({
+        title: planTitle,
+        tasks: aiTasks,
+      });
     } else {
-      onCreateTaskPage?.(tasks);
+      onCreateTaskPage?.({
+        title: planTitle,
+        tasks: aiTasks,
+      });
     }
     setAiTasks([]);
     setPrompt("");
@@ -87,7 +147,7 @@ export default function AIChat({
   const trigger =
     mode === "floating" ? (
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpenPlanner}
         aria-label="Open AI Planner"
         className="fixed bottom-6 right-6 z-40 group w-14 h-14 rounded-none flex items-center justify-center cursor-pointer transition-all duration-200"
         style={{
@@ -105,7 +165,7 @@ export default function AIChat({
       </button>
     ) : (
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpenPlanner}
         className="group cursor-pointer w-full px-3 py-2 text-sm flex items-center gap-2 font-mono tracking-tight transition-all duration-150"
         style={{
           background: "var(--color-surface)",
@@ -177,6 +237,8 @@ export default function AIChat({
             prompt={prompt}
             setPrompt={setPrompt}
             usageCount={usageCount}
+            usageWarning={usageWarning}
+            usageLimitReached={isUsageLimitReached}
           />
           <Actions
             loading={loading}
@@ -185,6 +247,7 @@ export default function AIChat({
             onConvert={convertToTasks}
             hasTasks={aiTasks.length > 0}
             converted={converted}
+            usageLimitReached={isUsageLimitReached}
           />
           <TaskList tasks={aiTasks} loading={loading} />
         </div>

@@ -334,7 +334,7 @@ export default function TasksPage() {
           </p>
         </div>
 
-        {user?.id && <AIChat userId={user.id} mode="floating" />}
+        {user?.id && <AIChat userId={String(user.id)} mode="floating" />}
       </>
     );
   }
@@ -659,11 +659,36 @@ export default function TasksPage() {
 
       {user?.id && (
         <AIChat
-          userId={user.id}
+          userId={String(user.id)}
           mode="floating"
-          onAddTasks={(generated) => {
+          onAddTasks={({ title, tasks: newTasks }) => {
             if (!taskPageId) return;
-            persistTasks([...generated, ...tasks]);
+            const formattedTasks = newTasks.map((t, i) => ({
+              id: Date.now() + i + Math.floor(Math.random() * 1000),
+              title: t.title,
+              completed: false,
+              date: t.date,
+              priority: t.priority,
+            }));
+            // 1tasks add
+            persistTasks([...formattedTasks, ...tasks]);
+
+            // 2 page name update
+            try {
+              const s = localStorage.getItem(TASK_NAV_PAGES_KEY);
+              const pages = s ? JSON.parse(s) : [];
+
+              localStorage.setItem(
+                TASK_NAV_PAGES_KEY,
+                JSON.stringify(
+                  pages.map((p: any) =>
+                    p.id === taskPageId ? { ...p, name: title } : p,
+                  ),
+                ),
+              );
+
+              window.dispatchEvent(new Event("task-pages-updated"));
+            } catch {}
           }}
         />
       )}

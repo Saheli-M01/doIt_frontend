@@ -58,10 +58,11 @@ export default function MainLayout({
     window.dispatchEvent(new Event("task-pages-updated"));
   };
 
-  const createTaskPage = (generatedTasks: Task[] = []) => {
+  const createTaskPage = (generatedTasks: Task[] = [], pageName?: string) => {
     const nextIndex = taskPages.length + 1;
     const id = `page-${Date.now()}`;
-    const newPage = { id, name: `Task Page ${nextIndex}` };
+    const finalName = pageName?.trim() || `Task Page ${nextIndex}`;
+    const newPage = { id, name: finalName };
     const updated = [...taskPages, newPage];
     setTaskPages(updated);
     persistTaskPages(updated);
@@ -130,7 +131,7 @@ export default function MainLayout({
                   Tasks
                 </div>
                 <button
-                  onClick={createTaskPage}
+                  onClick={() => createTaskPage()}
                   className="cursor-pointer p-1 rounded text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
                   aria-label="Create task page"
                 >
@@ -172,9 +173,19 @@ export default function MainLayout({
 
         <div className="pb-2 ">
           <AIChat
-            userId={user.id}
+            userId={String(user.id)}
             mode="sidebar"
-            onCreateTaskPage={createTaskPage}
+            onCreateTaskPage={({ title, tasks }) => {
+              const formattedTasks = tasks.map((t, i) => ({
+                id: Date.now() + i,
+                title: t.title,
+                completed: false,
+                date: t.date,
+                priority: t.priority,
+              }));
+
+              createTaskPage(formattedTasks, title);
+            }}
           />
         </div>
 

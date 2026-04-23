@@ -3,14 +3,9 @@
 import { useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-
-import {
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  CircleSmall,
-} from "lucide-react";
+import UnderlineExtension from "@tiptap/extension-underline";
+import { Bold, Italic, Strikethrough, CircleSmall } from "lucide-react";
+import { Underline as UnderlineIcon } from "lucide-react";
 
 type TaskEditorProps = {
   value?: string;
@@ -23,7 +18,7 @@ export default function TaskEditor({
 }: TaskEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [StarterKit, Underline],
+    extensions: [StarterKit, UnderlineExtension],
     content: value,
     onUpdate: ({ editor }) => {
       onChange?.(editor.getHTML());
@@ -68,7 +63,7 @@ export default function TaskEditor({
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           className={`${toolbarButtonBase} ${editor.isActive("underline") ? toolbarButtonActive : toolbarButtonIdle}`}
         >
-          <Underline />
+          <UnderlineIcon />
         </button>
 
         <button

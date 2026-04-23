@@ -7,6 +7,7 @@ type ActionsProps = {
   onConvert: () => void;
   hasTasks: boolean;
   converted: boolean;
+  usageLimitReached: boolean;
 };
 
 export default function Actions({
@@ -16,12 +17,13 @@ export default function Actions({
   onConvert,
   hasTasks,
   converted,
+  usageLimitReached,
 }: ActionsProps) {
   return (
     <div className="space-y-2 flex gap-4">
       <Button
         onClick={onGenerate}
-        disabled={loading || !prompt}
+        disabled={loading || !prompt || usageLimitReached}
         style={{
           background: "var(--color-primary)",
           boxShadow:

@@ -28,7 +28,24 @@ const PRIORITY_STYLES = {
   medium: "border-l-[4px] border-l-yellow-500",
   high: "border-l-[4px] border-l-red-500",
 };
-
+export type TaskCardProps = {
+  task: Task;
+  editingId: number | null;
+  editText: string;
+  editDate: string;
+  editPriority: Task["priority"];
+  isSelected?: boolean;
+  onToggle: (t: Task) => void;
+  onDelete: (id: number) => void;
+  onStartEdit: (t: Task) => void;
+  onSaveEdit: (t: Task) => void;
+  onCancelEdit: () => void;
+  onOpenDetails: (id: number) => void;
+  onSelect?: () => void;
+  setEditText: (v: string) => void;
+  setEditDate: (v: string) => void;
+  setEditPriority: (v: Task["priority"]) => void;
+};
 export function TaskCard({
   task,
   editingId,
@@ -46,24 +63,7 @@ export function TaskCard({
   setEditText,
   setEditDate,
   setEditPriority,
-}: {
-  task: Task;
-  editingId: number | null;
-  editText: string;
-  editDate: string;
-  editPriority: Task["priority"];
-  isSelected?: boolean;
-  onToggle: (t: Task) => void;
-  onDelete: (id: number) => void;
-  onStartEdit: (t: Task) => void;
-  onSaveEdit: (t: Task) => void;
-  onCancelEdit: () => void;
-  onOpenDetails: (id: number) => void;
-  onSelect?: () => void;
-  setEditText: (v: string) => void;
-  setEditDate: (v: string) => void;
-  setEditPriority: (v: Task["priority"]) => void;
-}) {
+}: TaskCardProps) {
   const pc = PRIORITY_CONFIG[task.priority];
   const isEditing = editingId === task.id;
 
