@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "../context/UserContext";
+import AIChat from "@/app/components/AIChat";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { LayoutDashboard, ListTodo, LogOut, Plus, Trash2 } from "lucide-react";
@@ -95,7 +96,7 @@ export default function MainLayout({
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="w-60 bg-surface border-r border-border text-foreground p-4 flex flex-col gap-2">
+      <aside className="w-60 h-screen sticky top-0 bg-surface border-r border-border text-foreground p-4 flex flex-col gap-2">
         {/* Logo + toggle row */}
         <div className="flex items-center justify-between mb-4">
           <ThemedLogo />
@@ -147,7 +148,7 @@ export default function MainLayout({
                   >
                     <button
                       onClick={() => router.push(`/tasks/${page.id}`)}
-                      className="text-sm text-left text-foreground-muted hover:text-foreground truncate flex-1"
+                      className="cursor-pointer text-sm text-left text-foreground-muted hover:text-foreground truncate flex-1"
                     >
                       {page.name}
                     </button>
@@ -165,6 +166,10 @@ export default function MainLayout({
           </div>
         </nav>
 
+        <div className="pb-2">
+          <AIChat userId={user.id} mode="sidebar" />
+        </div>
+
         <button
           onClick={handleLogout}
           className="px-4 py-2 rounded text-error hover:bg-muted transition-colors text-left flex items-center gap-2"
@@ -175,7 +180,7 @@ export default function MainLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 bg-background text-foreground">
+      <main className="flex-1 p-6 bg-background text-foreground overflow-y-auto h-screen">
         {children}
       </main>
     </div>
