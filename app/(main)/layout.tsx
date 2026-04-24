@@ -94,6 +94,7 @@ export default function MainLayout({
   };
 
   const createTaskPage = (generatedTasks: Task[] = [], pageName?: string) => {
+    if (!user) return;
     const nextIndex = taskPages.length + 1;
     const finalName = pageName?.trim() || `Task Page ${nextIndex}`;
     const slug = slugify(finalName);
@@ -113,6 +114,7 @@ export default function MainLayout({
   };
 
   const deleteTaskPage = (pageId: string) => {
+    if (!user) return;
     const updated = taskPages.filter((page) => page.id !== pageId);
     setTaskPages(updated);
     persistTaskPages(updated);
