@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  // Check if maintenance mode is enabled
-  const isMaintenanceMode = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true";
+  // Hardcoded to true so it instantly works in your deployment. 
+  // You can change this to false when you're done, or use the environment variable process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true"
+  const isMaintenanceMode = true;
 
   // Get the path the user is trying to access
   const path = request.nextUrl.pathname;
