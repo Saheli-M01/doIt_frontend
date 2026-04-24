@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
-import { UserProvider } from "./context/UserContext";
-import { ThemeProvider } from "./context/ThemeContext";
+import { Providers } from "./providers";
 
 const geistSans = Inter({
   variable: "--font-geist-sans",
@@ -15,8 +14,22 @@ const geistMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DoIt",
-  description: "Task management app",
+  title: "DoIt | Smart Task Management",
+  description: "Manage your tasks efficiently and elegantly with DoIt.",
+  icons: {
+    icon: [
+      {
+        media: "(prefers-color-scheme: light)",
+        url: "/logo_light.png",
+        href: "/logo_light.png",
+      },
+      {
+        media: "(prefers-color-scheme: dark)",
+        url: "/logo_dark.png",
+        href: "/logo_dark.png",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -53,9 +66,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ThemeProvider>
-          <UserProvider>{children}</UserProvider>
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

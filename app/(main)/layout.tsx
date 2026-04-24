@@ -2,11 +2,20 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useUser } from "../context/UserContext";
+import { useUser } from "@/app/context/UserContext";
 import AIChat from "@/app/components/AIChat/AIChat";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
-import { LayoutDashboard, ListTodo, LogOut, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import {
+  LayoutDashboard,
+  ListTodo,
+  LogOut,
+  Plus,
+  Trash2,
+  Menu,
+  X,
+} from "lucide-react";
 import type { Task } from "@/app/components/tasks/types";
 
 type TaskNavPage = {
@@ -35,6 +44,7 @@ export default function MainLayout({
   const pathname = usePathname();
   const { user, setUser, isLoading } = useUser();
   const [taskPages, setTaskPages] = useState<TaskNavPage[]>(readTaskNavPages);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -110,12 +120,39 @@ export default function MainLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen relative w-full overflow-hidden">
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Toggle Button (Mobile) */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className={`md:hidden fixed top-4 z-50 p-2 rounded-md bg-surface text-foreground border border-border shadow-sm transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? "left-[15.5rem]" : "left-4"
+        }`}
+        aria-label="Toggle Sidebar"
+      >
+        {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
       {/* Sidebar */}
-      <aside className="w-60 h-screen sticky top-0 bg-surface border-r border-border text-foreground p-4 flex flex-col gap-2">
+      <aside
+        className={`
+        fixed inset-y-0 left-0 z-40 w-60 bg-surface border-r border-border text-foreground p-4 flex flex-col gap-2 transform transition-transform duration-300 ease-in-out
+        md:relative md:translate-x-0 md:sticky md:top-0 md:h-screen
+        ${isSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}
+      `}
+      >
         {/* Logo + toggle row */}
-        <div className="flex items-center justify-between mb-4">
-          <ThemedLogo />
+        <div className="flex items-center justify-between mb-4 mt-12 md:mt-0">
+          <Link href="/" className="hover:opacity-80 transition-opacity">
+            <ThemedLogo />
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -210,8 +247,8 @@ export default function MainLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 bg-background text-foreground overflow-y-auto h-screen">
-        {children}
+      <main className="flex-1 w-full h-screen overflow-y-auto bg-background text-foreground relative">
+        <div className="p-4 md:p-6 mt-14 md:mt-0 max-w-full">{children}</div>
       </main>
     </div>
   );

@@ -10,7 +10,7 @@ import {
   ListTodo,
   Target,
 } from "lucide-react";
-import { useUser } from "../../context/UserContext";
+import { useUser } from "@/app/context/UserContext";
 import type { Task, TaskNavPage } from "@/app/components/tasks/types";
 
 const TASK_NAV_PAGES_KEY = "task-nav-pages";
@@ -65,33 +65,35 @@ export default function DashboardPage() {
         ...task,
         pageId: page.id,
         pageName: page.name,
-      }))
+      })),
     );
   }, []);
 
   const sortedByDate = useMemo(
     () =>
       [...allTasks].sort(
-        (a, b) =>
-          new Date(a.date).getTime() - new Date(b.date).getTime()
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       ),
-    [allTasks]
+    [allTasks],
   );
 
   const total = allTasks.length;
   const completed = allTasks.filter((task) => task.completed).length;
   const completionRate = total ? Math.round((completed / total) * 100) : 0;
   const highPriorityOpen = allTasks.filter(
-    (task) => task.priority === "high" && !task.completed
+    (task) => task.priority === "high" && !task.completed,
   ).length;
   const dueToday = allTasks.filter(
-    (task) => !task.completed && new Date(task.date).getTime() === today.getTime()
+    (task) =>
+      !task.completed && new Date(task.date).getTime() === today.getTime(),
   );
   const overdue = allTasks.filter(
-    (task) => !task.completed && new Date(task.date).getTime() < today.getTime()
+    (task) =>
+      !task.completed && new Date(task.date).getTime() < today.getTime(),
   );
   const upcoming = sortedByDate.filter(
-    (task) => !task.completed && new Date(task.date).getTime() > today.getTime()
+    (task) =>
+      !task.completed && new Date(task.date).getTime() > today.getTime(),
   );
   const recentDone = sortedByDate
     .filter((task) => task.completed)
@@ -108,7 +110,10 @@ export default function DashboardPage() {
           borderColor: "var(--color-border)",
         }}
       >
-        <p className="text-sm" style={{ color: "var(--color-foreground-muted)" }}>
+        <p
+          className="text-sm"
+          style={{ color: "var(--color-foreground-muted)" }}
+        >
           Dashboard Overview
         </p>
         <h1
@@ -117,12 +122,15 @@ export default function DashboardPage() {
         >
           Welcome, {user?.name || "User"}
         </h1>
-        <p className="mt-2 text-sm" style={{ color: "var(--color-foreground-muted)" }}>
+        <p
+          className="mt-2 text-sm"
+          style={{ color: "var(--color-foreground-muted)" }}
+        >
           {user?.email || "No email available"}
         </p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 grid-cols-2 md:grid-cols-4">
         {[
           {
             icon: <ListTodo size={16} />,
@@ -174,7 +182,10 @@ export default function DashboardPage() {
                 {card.icon}
               </span>
             </div>
-            <p className="mt-3 text-3xl font-extrabold" style={{ color: "var(--color-foreground)" }}>
+            <p
+              className="mt-3 text-3xl font-extrabold"
+              style={{ color: "var(--color-foreground)" }}
+            >
               {card.value}
             </p>
           </article>
@@ -183,13 +194,22 @@ export default function DashboardPage() {
 
       <section
         className="rounded-xl border p-4"
-        style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
+        style={{
+          background: "var(--color-surface)",
+          borderColor: "var(--color-border)",
+        }}
       >
         <div className="flex items-center justify-between">
-          <p className="font-semibold" style={{ color: "var(--color-foreground)" }}>
+          <p
+            className="font-semibold"
+            style={{ color: "var(--color-foreground)" }}
+          >
             Progress
           </p>
-          <span className="text-sm" style={{ color: "var(--color-foreground-muted)" }}>
+          <span
+            className="text-sm"
+            style={{ color: "var(--color-foreground-muted)" }}
+          >
             {completed} / {total}
           </span>
         </div>
@@ -212,14 +232,23 @@ export default function DashboardPage() {
       <section className="grid gap-4 xl:grid-cols-3">
         <article
           className="rounded-xl border p-4"
-          style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
+          style={{
+            background: "var(--color-surface)",
+            borderColor: "var(--color-border)",
+          }}
         >
-          <h2 className="font-semibold flex items-center gap-2" style={{ color: "var(--color-foreground)" }}>
+          <h2
+            className="font-semibold flex items-center gap-2"
+            style={{ color: "var(--color-foreground)" }}
+          >
             <CalendarDays size={16} /> Due Today
           </h2>
           <ul className="mt-3 space-y-2">
             {dueToday.length === 0 && (
-              <li className="text-sm" style={{ color: "var(--color-foreground-muted)" }}>
+              <li
+                className="text-sm"
+                style={{ color: "var(--color-foreground-muted)" }}
+              >
                 No tasks due today.
               </li>
             )}
@@ -229,7 +258,10 @@ export default function DashboardPage() {
                 className="rounded-lg border p-2"
                 style={{ borderColor: "var(--color-border)" }}
               >
-                <p className="text-sm font-medium" style={{ color: "var(--color-foreground)" }}>
+                <p
+                  className="text-sm font-medium"
+                  style={{ color: "var(--color-foreground)" }}
+                >
                   {task.title}
                 </p>
                 <Link
@@ -246,14 +278,23 @@ export default function DashboardPage() {
 
         <article
           className="rounded-xl border p-4"
-          style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
+          style={{
+            background: "var(--color-surface)",
+            borderColor: "var(--color-border)",
+          }}
         >
-          <h2 className="font-semibold flex items-center gap-2" style={{ color: "var(--color-foreground)" }}>
+          <h2
+            className="font-semibold flex items-center gap-2"
+            style={{ color: "var(--color-foreground)" }}
+          >
             <Clock3 size={16} /> Overdue
           </h2>
           <ul className="mt-3 space-y-2">
             {overdue.length === 0 && (
-              <li className="text-sm" style={{ color: "var(--color-foreground-muted)" }}>
+              <li
+                className="text-sm"
+                style={{ color: "var(--color-foreground-muted)" }}
+              >
                 No overdue tasks.
               </li>
             )}
@@ -262,15 +303,22 @@ export default function DashboardPage() {
                 key={task.id}
                 className="rounded-lg border p-2"
                 style={{
-                  borderColor: "color-mix(in srgb, var(--color-error) 25%, var(--color-border))",
+                  borderColor:
+                    "color-mix(in srgb, var(--color-error) 25%, var(--color-border))",
                   background:
                     "color-mix(in srgb, var(--color-error) 7%, transparent)",
                 }}
               >
-                <p className="text-sm font-medium" style={{ color: "var(--color-foreground)" }}>
+                <p
+                  className="text-sm font-medium"
+                  style={{ color: "var(--color-foreground)" }}
+                >
                   {task.title}
                 </p>
-                <p className="text-xs" style={{ color: "var(--color-foreground-muted)" }}>
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-foreground-muted)" }}
+                >
                   Due {formatDate(task.date)}
                 </p>
               </li>
@@ -280,14 +328,23 @@ export default function DashboardPage() {
 
         <article
           className="rounded-xl border p-4"
-          style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
+          style={{
+            background: "var(--color-surface)",
+            borderColor: "var(--color-border)",
+          }}
         >
-          <h2 className="font-semibold flex items-center gap-2" style={{ color: "var(--color-foreground)" }}>
+          <h2
+            className="font-semibold flex items-center gap-2"
+            style={{ color: "var(--color-foreground)" }}
+          >
             <CheckCircle2 size={16} /> Recently Completed
           </h2>
           <ul className="mt-3 space-y-2">
             {recentDone.length === 0 && (
-              <li className="text-sm" style={{ color: "var(--color-foreground-muted)" }}>
+              <li
+                className="text-sm"
+                style={{ color: "var(--color-foreground-muted)" }}
+              >
                 No completed tasks yet.
               </li>
             )}
@@ -297,10 +354,16 @@ export default function DashboardPage() {
                 className="rounded-lg border p-2"
                 style={{ borderColor: "var(--color-border)" }}
               >
-                <p className="text-sm font-medium" style={{ color: "var(--color-foreground)" }}>
+                <p
+                  className="text-sm font-medium"
+                  style={{ color: "var(--color-foreground)" }}
+                >
                   {task.title}
                 </p>
-                <p className="text-xs" style={{ color: "var(--color-foreground-muted)" }}>
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-foreground-muted)" }}
+                >
                   {task.pageName}
                 </p>
               </li>
@@ -311,10 +374,16 @@ export default function DashboardPage() {
 
       <section
         className="rounded-xl border p-4"
-        style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
+        style={{
+          background: "var(--color-surface)",
+          borderColor: "var(--color-border)",
+        }}
       >
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <h2 className="font-semibold" style={{ color: "var(--color-foreground)" }}>
+          <h2
+            className="font-semibold"
+            style={{ color: "var(--color-foreground)" }}
+          >
             Upcoming Tasks
           </h2>
           <Link
@@ -339,22 +408,36 @@ export default function DashboardPage() {
             <tbody>
               {upcoming.length === 0 && (
                 <tr>
-                  <td className="py-3" colSpan={4} style={{ color: "var(--color-foreground-muted)" }}>
+                  <td
+                    className="py-3"
+                    colSpan={4}
+                    style={{ color: "var(--color-foreground-muted)" }}
+                  >
                     No upcoming tasks.
                   </td>
                 </tr>
               )}
               {upcoming.slice(0, 8).map((task) => (
-                <tr key={task.id} className="border-t" style={{ borderColor: "var(--color-border)" }}>
-                  <td className="py-2" style={{ color: "var(--color-foreground)" }}>
+                <tr
+                  key={task.id}
+                  className="border-t"
+                  style={{ borderColor: "var(--color-border)" }}
+                >
+                  <td
+                    className="py-2"
+                    style={{ color: "var(--color-foreground)" }}
+                  >
                     {task.title}
                   </td>
-                  <td className="py-2" style={{ color: "var(--color-foreground-muted)" }}>
+                  <td
+                    className="py-2 text-sm md:text-md"
+                    style={{ color: "var(--color-foreground-muted)" }}
+                  >
                     {formatDate(task.date)}
                   </td>
                   <td className="py-2">
                     <span
-                      className="inline-flex rounded-full px-2 py-1 text-xs font-semibold capitalize"
+                      className="inline-flex rounded-full px-2 py-1 text-xs md:text-md font-semibold capitalize"
                       style={{
                         color:
                           task.priority === "high"
@@ -376,7 +459,7 @@ export default function DashboardPage() {
                   <td className="py-2">
                     <Link
                       href={`/tasks/${task.pageId}`}
-                      className="font-medium"
+                      className="font-medium text-sm md:text-md"
                       style={{ color: "var(--color-primary)" }}
                     >
                       {task.pageName}
