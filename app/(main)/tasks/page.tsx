@@ -25,10 +25,9 @@ import { DatePicker } from "@/app/components/tasks/DatePicker";
 import { Dropdown, type DropdownOption } from "@/app/components/tasks/Dropdown";
 import { groupTasks } from "@/app/components/tasks/grouping";
 import { useUser } from "@/app/context/UserContext";
+import { resolveBackendUserId } from "@/lib/backendUser";
 import {
   taskNavPagesKey,
-  taskItemsKey,
-  taskDetailsKey,
   type Task,
   type TaskNavPage,
   type ViewMode,
@@ -86,41 +85,81 @@ export default function TasksPage() {
     null,
   );
   const [detailsDraft, setDetailsDraft] = useState("<p>Add details...</p>");
+  const [backendUserId, setBackendUserId] = useState<number | null>(null);
+
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+
+  useEffect(() => {
+    if (!user) return;
+    const resolve = async () => {
+      try {
+        const resolvedId = await resolveBackendUserId(user);
+        setBackendUserId(resolvedId);
+      } catch {
+        setBackendUserId(null);
+      }
+    };
+    void resolve();
+  }, [user]);
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!taskPageId || !user?.id) {
+    if (!taskPageId || !user?.id || !backendUserId || !/^\d+$/.test(taskPageId)) {
       setTasks([]);
       setDetailsById({});
       setCurrentPage(null);
       return;
     }
-    const uid = user.id;
-    const load = () => {
+    const load = async () => {
       try {
-        const s = localStorage.getItem(taskItemsKey(uid, taskPageId));
-        setTasks(s ? (JSON.parse(s) as Task[]) : []);
+        const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`);
+        if (!res.ok) throw new Error("Failed to load tasks");
+        const allTasks = await res.json();
+        const pageTasks = (allTasks ?? [])
+          .filter((t: any) => String(t?.taskPage?.id ?? "") === taskPageId)
+          .map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            completed: t.completed,
+            date: t.date,
+            priority: t.priority,
+          })) as Task[];
+        setTasks(pageTasks);
       } catch {
         setTasks([]);
       }
       try {
-        const s = localStorage.getItem(taskDetailsKey(uid, taskPageId));
-        setDetailsById(s ? (JSON.parse(s) as Record<number, string>) : {});
+        const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`);
+        if (!res.ok) throw new Error("Failed to load task details");
+        const allTasks = await res.json();
+        const pageDetails: Record<number, string> = {};
+        (allTasks ?? []).forEach((t: any) => {
+          if (String(t?.taskPage?.id ?? "") === taskPageId && t.id) {
+            pageDetails[t.id] = t.details ?? "<p>Add details...</p>";
+          }
+        });
+        setDetailsById(pageDetails);
       } catch {
         setDetailsById({});
       }
       try {
-        const s = localStorage.getItem(taskNavPagesKey(uid));
-        const pages = s ? (JSON.parse(s) as TaskNavPage[]) : [];
-        setCurrentPage(pages.find((p) => p.id === taskPageId) ?? null);
+        const pagesRes = await fetch(`${baseUrl}/api/task-pages/${backendUserId}`);
+        if (!pagesRes.ok) throw new Error("Failed to load task pages");
+        const pages = await pagesRes.json();
+        const matched = (pages ?? []).find(
+          (p: { id: number; name: string }) => String(p.id) === taskPageId,
+        );
+        setCurrentPage(
+          matched ? { id: String(matched.id), name: matched.name } : null,
+        );
       } catch {
         setCurrentPage(null);
       }
     };
-    load();
+    void load();
     window.addEventListener("task-pages-updated", load);
     return () => window.removeEventListener("task-pages-updated", load);
-  }, [taskPageId, user?.id]);
+  }, [taskPageId, user?.id, backendUserId, baseUrl]);
 
   useEffect(() => {
     setExpandedGroups(new Set());
@@ -160,22 +199,46 @@ export default function TasksPage() {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const persistTasks = (next: Task[]) => {
     setTasks(next);
-    if (taskPageId && user?.id)
-      localStorage.setItem(taskItemsKey(user.id, taskPageId), JSON.stringify(next));
   };
 
-  const addTask = () => {
-    if (!taskPageId || !title.trim() || !date) return;
+  const addTask = async () => {
+    if (!taskPageId || !title.trim() || !date || !backendUserId || !/^\d+$/.test(taskPageId)) return;
+    const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: title.trim(),
+        completed: false,
+        date,
+        priority,
+        details: "",
+        taskPageId: Number(taskPageId),
+      }),
+    });
+    if (!res.ok) return;
+    const created = await res.json();
     persistTasks([
-      { id: Date.now(), title: title.trim(), completed: false, date, priority },
+      { id: created.id, title: created.title, completed: created.completed, date: created.date, priority: created.priority },
       ...tasks,
     ]);
     setTitle("");
     setDate("");
   };
 
-  const updateTask = (task: Task) =>
+  const updateTask = async (task: Task) => {
+    if (!taskPageId || !/^\d+$/.test(taskPageId)) return;
+    const res = await fetch(`${baseUrl}/api/tasks/${task.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...task,
+        details: detailsById[task.id] ?? "",
+        taskPage: { id: Number(taskPageId) },
+      }),
+    });
+    if (!res.ok) return;
     persistTasks(tasks.map((t) => (t.id === task.id ? task : t)));
+  };
 
   const startEditing = (task: Task) => {
     setEditingId(task.id);
@@ -184,9 +247,9 @@ export default function TasksPage() {
     setEditPriority(task.priority);
   };
 
-  const saveEditedTask = (task: Task) => {
+  const saveEditedTask = async (task: Task) => {
     if (!editText.trim() || !editDate) return;
-    updateTask({
+    await updateTask({
       ...task,
       title: editText.trim(),
       date: editDate,
@@ -195,16 +258,15 @@ export default function TasksPage() {
     setEditingId(null);
   };
 
-  const toggleTask = (task: Task) =>
+  const toggleTask = async (task: Task) =>
     updateTask({ ...task, completed: !task.completed });
 
-  const deleteTask = (id: number) => {
+  const deleteTask = async (id: number) => {
+    await fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" });
     persistTasks(tasks.filter((t) => t.id !== id));
     const next = { ...detailsById };
     delete next[id];
     setDetailsById(next);
-    if (taskPageId && user?.id)
-      localStorage.setItem(taskDetailsKey(user.id, taskPageId), JSON.stringify(next));
   };
 
   const openDetailsSlider = (taskId: number) => {
@@ -212,11 +274,22 @@ export default function TasksPage() {
     setDetailsDraft(detailsById[taskId] ?? "<p>Add details...</p>");
   };
 
-  const saveDetails = () => {
+  const saveDetails = async () => {
     if (openDetailsTaskId === null || !taskPageId || !user?.id) return;
     const updated = { ...detailsById, [openDetailsTaskId]: detailsDraft };
+    const baseTask = tasks.find((t) => t.id === openDetailsTaskId);
+    if (baseTask) {
+      await fetch(`${baseUrl}/api/tasks/${openDetailsTaskId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...baseTask,
+          details: detailsDraft,
+          taskPage: { id: Number(taskPageId) },
+        }),
+      });
+    }
     setDetailsById(updated);
-    localStorage.setItem(taskDetailsKey(user.id, taskPageId), JSON.stringify(updated));
     setOpenDetailsTaskId(null);
   };
 
@@ -245,6 +318,9 @@ export default function TasksPage() {
         JSON.stringify(
           pages.map((p) => (p.id === taskPageId ? { ...p, name: next } : p)),
         ),
+      );
+      setCurrentPage((prev) =>
+        prev && prev.id === taskPageId ? { ...prev, name: next } : prev,
       );
       window.dispatchEvent(new Event("task-pages-updated"));
       setIsRenamingPage(false);
@@ -677,20 +753,53 @@ export default function TasksPage() {
         <AIChat
           userId={String(user.id)}
           mode="floating"
-          onAddTasks={({ title, tasks: newTasks }) => {
-            if (!taskPageId) return;
+          onAddTasks={async ({ title, tasks: newTasks }) => {
+            if (!taskPageId || !backendUserId || !/^\d+$/.test(taskPageId)) return;
+            const today = new Date().toISOString().split("T")[0];
             const formattedTasks = newTasks.map((t, i) => ({
               id: Date.now() + i + Math.floor(Math.random() * 1000),
               title: t.title,
               completed: false,
-              date: t.date,
+              date: t.date || today,
               priority: t.priority,
             }));
-            // 1tasks add
-            persistTasks([...formattedTasks, ...tasks]);
+            const createdTasks: Task[] = [];
+            for (const task of formattedTasks) {
+              const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  title: task.title,
+                  completed: false,
+                  date: task.date,
+                  priority: task.priority,
+                  details: "",
+                  taskPageId: Number(taskPageId),
+                }),
+              });
+              if (res.ok) {
+                const created = await res.json();
+                createdTasks.push({
+                  id: created.id,
+                  title: created.title,
+                  completed: created.completed,
+                  date: created.date,
+                  priority: created.priority,
+                });
+              }
+            }
+            persistTasks([...createdTasks, ...tasks]);
 
             // 2 page name update
             try {
+              if (title?.trim()) {
+                await fetch(`${baseUrl}/api/task-pages/${taskPageId}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: title.trim() }),
+                });
+              }
+
               const s = localStorage.getItem(taskNavPagesKey(user.id));
               const pages = s ? JSON.parse(s) : [];
 
@@ -702,6 +811,13 @@ export default function TasksPage() {
                   ),
                 ),
               );
+              if (title?.trim()) {
+                setCurrentPage((prev) =>
+                  prev && prev.id === taskPageId
+                    ? { ...prev, name: title.trim() }
+                    : prev,
+                );
+              }
 
               window.dispatchEvent(new Event("task-pages-updated"));
             } catch {}

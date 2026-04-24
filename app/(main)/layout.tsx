@@ -6,6 +6,7 @@ import { useUser } from "@/app/context/UserContext";
 import AIChat from "@/app/components/AIChat/AIChat";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
+import { resolveBackendUserId } from "@/lib/backendUser";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -24,18 +25,6 @@ type TaskNavPage = {
   name: string;
 };
 
-const TASK_NAV_PAGES_KEY = "task-nav-pages";
-
-const readTaskNavPages = (): TaskNavPage[] => {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(TASK_NAV_PAGES_KEY);
-    return stored ? (JSON.parse(stored) as TaskNavPage[]) : [];
-  } catch {
-    return [];
-  }
-};
-
 export default function MainLayout({
   children,
 }: {
@@ -47,15 +36,27 @@ export default function MainLayout({
   const [taskPages, setTaskPages] = useState<TaskNavPage[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Load task pages scoped to this user once user is known
+  // Load task pages from backend for this user
   useEffect(() => {
     if (!user) return;
-    try {
-      const stored = localStorage.getItem(taskNavPagesKey(user.id));
-      setTaskPages(stored ? (JSON.parse(stored) as TaskNavPage[]) : []);
-    } catch {
-      setTaskPages([]);
-    }
+    const loadPages = async () => {
+      try {
+        const backendUserId = await resolveBackendUserId(user);
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+        const res = await fetch(`${baseUrl}/api/task-pages/${backendUserId}`);
+        if (!res.ok) throw new Error("Failed to load task pages");
+        const pages = await res.json();
+        const normalized = (pages ?? []).map((p: { id: number; name: string }) => ({
+          id: String(p.id),
+          name: p.name,
+        }));
+        setTaskPages(normalized);
+        localStorage.setItem(taskNavPagesKey(user.id), JSON.stringify(normalized));
+      } catch {
+        setTaskPages([]);
+      }
+    };
+    void loadPages();
   }, [user]);
 
   useEffect(() => {
@@ -86,40 +87,6 @@ export default function MainLayout({
     window.dispatchEvent(new Event("task-pages-updated"));
   };
 
-  const resolveBackendUserId = async (): Promise<number> => {
-    if (!user) {
-      throw new Error("User not available");
-    }
-
-    const currentId = String(user.id);
-    if (/^\d+$/.test(currentId)) {
-      return Number(currentId);
-    }
-
-    const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
-    const registerRes = await fetch(`${baseUrl}/api/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: user.name ?? user.email ?? "User",
-        email: user.email ?? "",
-        firebaseUid: currentId,
-      }),
-    });
-
-    if (!registerRes.ok) {
-      const details = await registerRes.text();
-      throw new Error(`Failed to sync user with backend (${registerRes.status}): ${details}`);
-    }
-
-    const backendUser = await registerRes.json();
-    if (!backendUser?.id) {
-      throw new Error("Backend user id missing in register response");
-    }
-
-    return Number(backendUser.id);
-  };
-
   const createTaskPage = async (generatedTasks: Task[] = [], pageName?: string) => {
 
     if (!user) return;
@@ -129,7 +96,7 @@ export default function MainLayout({
     const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 
-    const backendUserId = await resolveBackendUserId();
+    const backendUserId = await resolveBackendUserId(user);
 
     const createRes = await fetch(`${baseUrl}/api/task-pages/${backendUserId}`, {
       method: "POST",
@@ -155,6 +122,26 @@ export default function MainLayout({
     const updated = [...taskPages, newPage];
     setTaskPages(updated);
     persistTaskPages(updated);
+
+    if (generatedTasks.length > 0) {
+      const today = new Date().toISOString().split("T")[0];
+      await Promise.all(
+        generatedTasks.map((task) =>
+          fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: task.title,
+              completed: Boolean(task.completed),
+              date: task.date || today,
+              priority: task.priority,
+              details: "",
+              taskPageId: Number(id),
+            }),
+          }),
+        ),
+      );
+    }
     
     router.push(`/tasks/${id}`);
   };

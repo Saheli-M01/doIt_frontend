@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Cpu } from "lucide-react";
+import { resolveBackendUserId } from "@/lib/backendUser";
 
 import PromptInput from "./PromptInput";
 import TaskList from "./TasksList";
@@ -51,6 +52,42 @@ export default function AIChat({
 
   const isUsageLimitReached = usageCount >= MAX_USAGE;
 
+  useEffect(() => {
+    if (!open) return;
+
+    const syncUsageCount = async () => {
+      try {
+        const stored = localStorage.getItem("user");
+        if (!stored) return;
+        const parsed = JSON.parse(stored) as {
+          id: string | number;
+          name?: string;
+          email?: string;
+        };
+
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+        const registerRes = await fetch(`${baseUrl}/api/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: parsed.name ?? parsed.email ?? "User",
+            email: parsed.email ?? "",
+            firebaseUid: String(parsed.id),
+          }),
+        });
+
+        if (!registerRes.ok) return;
+        const backendUser = await registerRes.json();
+        const count = Number(backendUser?.aiUsageCount ?? 0);
+        setUsageCount(Number.isFinite(count) ? Math.min(MAX_USAGE, count) : 0);
+      } catch {
+        // Keep UI functional even if usage sync fails.
+      }
+    };
+
+    void syncUsageCount();
+  }, [open]);
+
   const handleOpenPlanner = () => {
     if (isUsageLimitReached) {
       setUsageWarning(
@@ -71,13 +108,39 @@ export default function AIChat({
     if (!prompt.trim()) return;
     setLoading(true);
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate/${userId}`, {
+    let aiUserId = userId;
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const parsed = JSON.parse(stored) as {
+          id: string | number;
+          name?: string;
+          email?: string;
+        };
+        aiUserId = String(await resolveBackendUserId(parsed));
+      }
+    } catch {
+      aiUserId = userId;
+    }
+
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate/${aiUserId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
     });
 
     const text = await res.text();
+    if (!res.ok) {
+      try {
+        const err = JSON.parse(text) as { error?: string; details?: string };
+        alert(err.details ? `${err.error ?? "Request failed"}\n\n${err.details}` : (err.error ?? "Request failed"));
+      } catch {
+        alert(text);
+      }
+      setLoading(false);
+      return;
+    }
+
     let data: unknown;
     try {
       data = JSON.parse(text);
