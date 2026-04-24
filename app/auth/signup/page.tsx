@@ -85,6 +85,19 @@ export default function SignupPage() {
       // Set display name
       await updateProfile(res.user, { displayName: form.name });
 
+      // Register user with backend
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+      await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          firebaseUid: res.user.uid,
+        }),
+      });
+
       // Send verification email
       await sendEmailVerification(res.user);
 
@@ -104,7 +117,22 @@ export default function SignupPage() {
     setGoogleLoading(true);
     try {
       const res = await signInWithPopup(auth, googleProvider);
-      saveAndRedirect(res.user);
+      const user = res.user;
+
+      // Register/sync user with backend
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+      await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: user.displayName,
+          email: user.email,
+          password: "google-login",
+          firebaseUid: user.uid,
+        }),
+      });
+
+      saveAndRedirect(user);
     } catch (err: any) {
       setError(getFirebaseErrorMessage(err?.code ?? ""));
     } finally {

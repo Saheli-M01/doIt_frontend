@@ -91,7 +91,22 @@ export default function LoginPage() {
     setGoogleLoading(true);
     try {
       const res = await signInWithPopup(auth, googleProvider);
-      saveAndRedirect(res.user);
+      const user = res.user;
+
+      // Register/sync user with backend
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+      await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: user.displayName,
+          email: user.email,
+          password: "google-login",
+          firebaseUid: user.uid,
+        }),
+      });
+
+      saveAndRedirect(user);
     } catch (err: any) {
       setError(getFirebaseErrorMessage(err?.code ?? ""));
     } finally {

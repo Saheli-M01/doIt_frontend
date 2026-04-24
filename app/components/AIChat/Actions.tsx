@@ -20,7 +20,7 @@ export default function Actions({
   usageLimitReached,
 }: ActionsProps) {
   return (
-    <div className="space-y-2 flex gap-4">
+    <div className="flex gap-4 items-center">
       <Button
         onClick={onGenerate}
         disabled={loading || !prompt || usageLimitReached}
