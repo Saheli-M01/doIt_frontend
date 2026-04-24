@@ -85,18 +85,24 @@ export default function DashboardPage() {
   const highPriorityOpen = allTasks.filter(
     (task) => task.priority === "high" && !task.completed,
   ).length;
-  const dueToday = allTasks.filter(
-    (task) =>
-      !task.completed && new Date(task.date).getTime() === today.getTime(),
-  );
-  const overdue = allTasks.filter(
-    (task) =>
-      !task.completed && new Date(task.date).getTime() < today.getTime(),
-  );
-  const upcoming = sortedByDate.filter(
-    (task) =>
-      !task.completed && new Date(task.date).getTime() > today.getTime(),
-  );
+  const dueToday = allTasks.filter((task) => {
+    if (task.completed) return false;
+    const taskDate = new Date(task.date);
+    taskDate.setHours(0, 0, 0, 0);
+    return taskDate.getTime() === today.getTime();
+  });
+  const overdue = allTasks.filter((task) => {
+    if (task.completed) return false;
+    const taskDate = new Date(task.date);
+    taskDate.setHours(0, 0, 0, 0);
+    return taskDate.getTime() < today.getTime();
+  });
+  const upcoming = sortedByDate.filter((task) => {
+    if (task.completed) return false;
+    const taskDate = new Date(task.date);
+    taskDate.setHours(0, 0, 0, 0);
+    return taskDate.getTime() > today.getTime();
+  });
   const recentDone = sortedByDate
     .filter((task) => task.completed)
     .slice(-5)
