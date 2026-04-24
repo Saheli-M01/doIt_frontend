@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   // Hardcoded to true so it instantly works in your deployment. 
   // You can change this to false when you're done, or use the environment variable process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true"
-  const isMaintenanceMode = true;
+  const isMaintenanceMode = false;
 
   // Get the path the user is trying to access
   const path = request.nextUrl.pathname;

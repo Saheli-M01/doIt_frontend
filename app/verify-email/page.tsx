@@ -67,15 +67,24 @@ export default function VerifyEmailPage() {
               </div>
               <h1 className="text-xl font-bold mb-2">Email verified!</h1>
               <p className="text-sm text-foreground-muted mb-6">
-                Your email has been verified. You can now sign in.
+                Your email is verified. If you have not set a password yet, use the password setup link sent to your inbox.
               </p>
-              <Link
-                href="/auth/login"
-                className="inline-block px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-dark
-                           text-white text-sm font-semibold transition-colors duration-200"
-              >
-                Sign in
-              </Link>
+              <div className="flex flex-col gap-3">
+                <Link
+                  href="/auth/forgot-password"
+                  className="inline-block px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-dark
+                             text-white text-sm font-semibold transition-colors duration-200"
+                >
+                  Set password
+                </Link>
+                <Link
+                  href="/auth/login"
+                  className="inline-block px-6 py-2.5 rounded-lg border border-border bg-surface hover:bg-muted
+                             text-foreground text-sm font-semibold transition-colors duration-200"
+                >
+                  Sign in
+                </Link>
+              </div>
             </>
           )}
 

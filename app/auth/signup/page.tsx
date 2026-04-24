@@ -9,6 +9,7 @@ import Link from "next/link";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
@@ -47,7 +48,7 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const { user, setUser, isLoading } = useUser();
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState({ name: "", email: "" });
 
   useEffect(() => {
     if (!isLoading && user) router.push("/dashboard");
@@ -65,22 +66,17 @@ export default function SignupPage() {
 
   const handleSignup = async () => {
     setError("");
-    if (!form.name || !form.email || !form.password || !form.confirm) {
+    if (!form.name || !form.email) {
       setError("Please fill in all fields.");
-      return;
-    }
-    if (form.password !== form.confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (form.password.length < 6) {
-      setError("Password must be at least 6 characters.");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      // Temporary credential is used only to bootstrap Firebase user creation.
+      // User will set their real password from the email link.
+      const temporaryPassword = `Tmp#${crypto.randomUUID()}`;
+      const res = await createUserWithEmailAndPassword(auth, form.email, temporaryPassword);
 
       // Set display name
       await updateProfile(res.user, { displayName: form.name });
@@ -93,13 +89,13 @@ export default function SignupPage() {
         body: JSON.stringify({
           name: form.name,
           email: form.email,
-          password: form.password,
           firebaseUid: res.user.uid,
         }),
       });
 
       // Send verification email
       await sendEmailVerification(res.user);
+      await sendPasswordResetEmail(auth, form.email);
 
       // Sign out — user must verify email before logging in
       await auth.signOut();
@@ -167,7 +163,7 @@ export default function SignupPage() {
               <p className="text-sm text-foreground-muted mb-6">
                 We sent a verification link to{" "}
                 <span className="text-foreground font-medium">{form.email}</span>.
-                Click the link in the email, then sign in.
+                Verify your email first, then use the password setup link in your inbox.
               </p>
               <Link
                 href="/auth/login"
@@ -238,38 +234,9 @@ export default function SignupPage() {
                   />
                 </div>
 
-                {/* Password */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium" htmlFor="password">Password</label>
-                  <input
-                    id="password"
-                    type="password"
-                    placeholder="Min. 6 characters"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
-                               text-foreground placeholder:text-foreground-muted text-sm
-                               focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
-                               transition-colors duration-150"
-                  />
-                </div>
-
-                {/* Confirm */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium" htmlFor="confirm">Confirm password</label>
-                  <input
-                    id="confirm"
-                    type="password"
-                    placeholder="••••••••"
-                    value={form.confirm}
-                    onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-                    onKeyDown={(e) => e.key === "Enter" && handleSignup()}
-                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
-                               text-foreground placeholder:text-foreground-muted text-sm
-                               focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
-                               transition-colors duration-150"
-                  />
-                </div>
+                <p className="text-xs text-foreground-muted">
+                  No password needed now. After signup, we will email you a verification link and a link to set your password.
+                </p>
 
                 {/* Error */}
                 {error && (
