@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -11,10 +11,8 @@ import {
   Target,
 } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
-import type { Task, TaskNavPage } from "@/app/components/tasks/types";
-import { taskNavPagesKey, taskItemsKey } from "@/app/components/tasks/types";
-
-const TASK_NAV_PAGES_KEY = "task-nav-pages";
+import type { Task } from "@/app/components/tasks/types";
+import { resolveBackendUserId } from "@/lib/backendUser";
 
 type DashboardTask = Task & {
   pageId: string;
@@ -35,41 +33,72 @@ function formatDate(value: string): string {
   });
 }
 
-function readTaskPages(userId: string | number): TaskNavPage[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(taskNavPagesKey(userId));
-    return raw ? (JSON.parse(raw) as TaskNavPage[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function readTasksByPage(userId: string | number, pageId: string): Task[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(taskItemsKey(userId, pageId));
-    return raw ? (JSON.parse(raw) as Task[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 export default function DashboardPage() {
   const { user } = useUser();
+  const [allTasks, setAllTasks] = useState<DashboardTask[]>([]);
   const today = startOfToday();
 
-  const allTasks = useMemo<DashboardTask[]>(() => {
-    if (!user?.id) return [];
-    const pages = readTaskPages(user.id);
-    return pages.flatMap((page) =>
-      readTasksByPage(user.id, page.id).map((task) => ({
-        ...task,
-        pageId: page.id,
-        pageName: page.name,
-      })),
-    );
-  }, [user?.id]);
+  useEffect(() => {
+    if (!user) {
+      setAllTasks([]);
+      return;
+    }
+
+    const loadDashboardData = async () => {
+      try {
+        const backendUserId = await resolveBackendUserId(user);
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+
+        const [tasksRes, pagesRes] = await Promise.all([
+          fetch(`${baseUrl}/api/tasks/${backendUserId}`),
+          fetch(`${baseUrl}/api/task-pages/${backendUserId}`),
+        ]);
+
+        if (!tasksRes.ok || !pagesRes.ok) {
+          setAllTasks([]);
+          return;
+        }
+
+        const tasksJson = await tasksRes.json();
+        const pagesJson = await pagesRes.json();
+
+        const pageNameById = new Map<string, string>(
+          (pagesJson ?? []).map((page: { id: number; name: string }) => [
+            String(page.id),
+            page.name,
+          ]),
+        );
+
+        const normalized = (tasksJson ?? []).map(
+          (task: {
+            id: number;
+            title: string;
+            completed: boolean;
+            date: string;
+            priority: "low" | "medium" | "high";
+            taskPage?: { id?: number };
+          }) => {
+            const pageId = String(task.taskPage?.id ?? "");
+            return {
+              id: task.id,
+              title: task.title,
+              completed: task.completed,
+              date: task.date,
+              priority: task.priority,
+              pageId,
+              pageName: pageNameById.get(pageId) ?? "Task Page",
+            } satisfies DashboardTask;
+          },
+        );
+
+        setAllTasks(normalized);
+      } catch {
+        setAllTasks([]);
+      }
+    };
+
+    void loadDashboardData();
+  }, [user]);
 
   const sortedByDate = useMemo(
     () =>

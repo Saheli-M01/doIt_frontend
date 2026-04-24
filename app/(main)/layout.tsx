@@ -18,7 +18,11 @@ import {
   X,
 } from "lucide-react";
 import type { Task } from "@/app/components/tasks/types";
-import { taskNavPagesKey, taskItemsKey } from "@/app/components/tasks/types";
+import {
+  taskNavPagesKey,
+  taskItemsKey,
+  taskDetailsKey,
+} from "@/app/components/tasks/types";
 
 type TaskNavPage = {
   id: string;
@@ -163,6 +167,8 @@ export default function MainLayout({
     const updated = taskPages.filter((page) => page.id !== pageId);
     setTaskPages(updated);
     persistTaskPages(updated);
+    localStorage.removeItem(taskItemsKey(user.id, pageId));
+    localStorage.removeItem(taskDetailsKey(user.id, pageId));
     if (pathname === `/tasks/${pageId}`) {
       router.push("/tasks");
     }
