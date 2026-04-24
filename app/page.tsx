@@ -73,15 +73,15 @@ export default function Home() {
           </h1>
 
           <p className="text-lg text-foreground-muted mb-10 leading-relaxed">
-            DoIt keeps your tasks, projects, and ideas in one clean space —
+            GetDoIt keeps your tasks, projects, and ideas in one clean space —
             with an AI assistant that actually helps.
           </p>
 
           <Link
             href="/auth/login"
-            className="inline-block px-8 py-3 rounded-xl bg-primary text-white font-semibold text-base hover:bg-primary-dark transition-colors duration-200 shadow-md hover:shadow-lg"
+            className="inline-block px-8 py-3 rounded-full bg-primary text-white font-semibold text-base hover:bg-primary-dark transition-colors duration-200 shadow-md hover:shadow-lg"
           >
-            Get started free
+            Get started
           </Link>
         </div>
 
@@ -103,8 +103,8 @@ export default function Home() {
       {/* ── Footer ── */}
       <footer className="border-t border-border mt-3">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between text-xs text-foreground-muted">
-          <span>© {new Date().getFullYear()} DoIt. All rights reserved.</span>
-          <span>Built for focus.</span>
+          <span>© {new Date().getFullYear()} GetDoIt. All rights reserved.</span>
+          <span className="text-xs text-foreground-muted">Built for focus by <Link href="https://sahelimondal.in" target="_blank" className="hover:text-primary">Saheli Mondal</Link></span>
         </div>
       </footer>
     </div>
