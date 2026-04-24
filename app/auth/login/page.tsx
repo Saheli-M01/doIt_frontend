@@ -132,6 +132,12 @@ export default function LoginPage() {
           <div className="mb-8 text-center">
             <h1 className="text-2xl font-bold tracking-tight mb-1">Welcome back</h1>
             <p className="text-sm text-foreground-muted">Sign in to your DoIt account</p>
+            <p className="text-xs text-foreground-muted mt-2">
+              New user?{" "}
+              <Link href="/auth/signup" className="text-primary hover:text-primary-dark font-medium transition-colors">
+                Create an account first
+              </Link>
+            </p>
           </div>
 
           <div className="space-y-3">

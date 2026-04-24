@@ -50,8 +50,14 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Link
-              href="/auth/login"
+              href="/auth/signup"
               className="px-4 py-2 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors duration-200"
+            >
+              Sign up
+            </Link>
+            <Link
+              href="/auth/login"
+              className="px-4 py-2 rounded-full border border-border bg-surface text-foreground text-sm font-medium hover:bg-muted transition-colors duration-200"
             >
               Sign in
             </Link>
@@ -77,12 +83,20 @@ export default function Home() {
             with an AI assistant that actually helps.
           </p>
 
-          <Link
-            href="/auth/login"
-            className="inline-block px-8 py-3 rounded-full bg-primary text-white font-semibold text-base hover:bg-primary-dark transition-colors duration-200 shadow-md hover:shadow-lg"
-          >
-            Get started
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href="/auth/signup"
+              className="inline-block px-8 py-3 rounded-full bg-primary text-white font-semibold text-base hover:bg-primary-dark transition-colors duration-200 shadow-md hover:shadow-lg"
+            >
+              Get started - Sign up
+            </Link>
+            <Link
+              href="/auth/login"
+              className="inline-block px-8 py-3 rounded-full border border-border bg-surface text-foreground font-semibold text-base hover:bg-muted transition-colors duration-200"
+            >
+              Already have account? Sign in
+            </Link>
+          </div>
         </div>
 
         {/* ── Feature cards ── */}
