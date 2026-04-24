@@ -220,11 +220,24 @@ export default function TasksPage() {
     setOpenDetailsTaskId(null);
   };
 
-  const savePageTitle = () => {
+  const savePageTitle = async () => {
     if (!taskPageId || !user?.id) return;
     const next = pageTitleInput.trim();
     if (!next) return;
     try {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+      if (/^\d+$/.test(taskPageId)) {
+        const updateRes = await fetch(`${baseUrl}/api/task-pages/${taskPageId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: next }),
+        });
+        if (!updateRes.ok) {
+          const details = await updateRes.text();
+          throw new Error(`Failed to rename task page (${updateRes.status}): ${details}`);
+        }
+      }
+
       const s = localStorage.getItem(taskNavPagesKey(user.id));
       const pages = s ? (JSON.parse(s) as TaskNavPage[]) : [];
       localStorage.setItem(

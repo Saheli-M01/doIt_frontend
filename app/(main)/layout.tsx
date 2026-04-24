@@ -63,13 +63,6 @@ export default function MainLayout({
       router.push("/auth/login");
     }
   }, [user, isLoading, router]);
-  function slugify(text: string) {
-    return text
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-  }
   useEffect(() => {
     const onTaskPagesUpdated = () => {
       if (!user) return;
@@ -93,28 +86,93 @@ export default function MainLayout({
     window.dispatchEvent(new Event("task-pages-updated"));
   };
 
-  const createTaskPage = (generatedTasks: Task[] = [], pageName?: string) => {
+  const resolveBackendUserId = async (): Promise<number> => {
+    if (!user) {
+      throw new Error("User not available");
+    }
+
+    const currentId = String(user.id);
+    if (/^\d+$/.test(currentId)) {
+      return Number(currentId);
+    }
+
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+    const registerRes = await fetch(`${baseUrl}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: user.name ?? user.email ?? "User",
+        email: user.email ?? "",
+        firebaseUid: currentId,
+      }),
+    });
+
+    if (!registerRes.ok) {
+      const details = await registerRes.text();
+      throw new Error(`Failed to sync user with backend (${registerRes.status}): ${details}`);
+    }
+
+    const backendUser = await registerRes.json();
+    if (!backendUser?.id) {
+      throw new Error("Backend user id missing in register response");
+    }
+
+    return Number(backendUser.id);
+  };
+
+  const createTaskPage = async (generatedTasks: Task[] = [], pageName?: string) => {
+
     if (!user) return;
     const nextIndex = taskPages.length + 1;
     const finalName = pageName?.trim() || `Task Page ${nextIndex}`;
-    const slug = slugify(finalName);
 
-    // short id (6 chars)
-    const shortId = Math.random().toString(36).substring(2, 8);
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
-    const id = `${slug}-${shortId}`;
+
+    const backendUserId = await resolveBackendUserId();
+
+    const createRes = await fetch(`${baseUrl}/api/task-pages/${backendUserId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: finalName,
+        sortOrder: 0,
+      }),
+    });
+    if (!createRes.ok) {
+      const details = await createRes.text();
+      throw new Error(`Failed to create task page (${createRes.status}): ${details}`);
+    }
+    const createdPage = await createRes.json();
+    const id = String(createdPage?.id ?? "");
+    if (!id) {
+      throw new Error("Backend did not return created task page id");
+    }
+
     const newPage = { id, name: finalName };
     const updated = [...taskPages, newPage];
     setTaskPages(updated);
     persistTaskPages(updated);
-    if (generatedTasks.length > 0) {
-      localStorage.setItem(taskItemsKey(user.id, id), JSON.stringify(generatedTasks));
-    }
+    
     router.push(`/tasks/${id}`);
   };
 
-  const deleteTaskPage = (pageId: string) => {
+  const deleteTaskPage = async (pageId: string) => {
     if (!user) return;
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+
+    if (/^\d+$/.test(pageId)) {
+      const deleteRes = await fetch(`${baseUrl}/api/task-pages/${pageId}`, {
+        method: "DELETE",
+      });
+      if (!deleteRes.ok) {
+        const details = await deleteRes.text();
+        throw new Error(`Failed to delete task page (${deleteRes.status}): ${details}`);
+      }
+    }
+
     const updated = taskPages.filter((page) => page.id !== pageId);
     setTaskPages(updated);
     persistTaskPages(updated);
@@ -153,9 +211,8 @@ export default function MainLayout({
       {/* Sidebar Toggle Button (Mobile) */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={`md:hidden fixed top-4 z-50 p-2 rounded-md bg-surface text-foreground border border-border shadow-sm transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? "left-[15.5rem]" : "left-4"
-        }`}
+        className={`md:hidden fixed top-4 z-50 p-2 rounded-md bg-surface text-foreground border border-border shadow-sm transition-all duration-300 ease-in-out ${isSidebarOpen ? "left-[15.5rem]" : "left-4"
+          }`}
         aria-label="Toggle Sidebar"
       >
         {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
@@ -180,9 +237,8 @@ export default function MainLayout({
         <nav className="flex flex-col gap-1 flex-1">
           <button
             onClick={() => router.push("/dashboard")}
-            className={`cursor-pointer text-left px-4 py-2 rounded transition-colors text-foreground flex items-center gap-2 ${
-              isDashboardActive ? "bg-muted" : "hover:bg-muted"
-            }`}
+            className={`cursor-pointer text-left px-4 py-2 rounded transition-colors text-foreground flex items-center gap-2 ${isDashboardActive ? "bg-muted" : "hover:bg-muted"
+              }`}
           >
             <LayoutDashboard size={18} />
             Dashboard
@@ -190,14 +246,13 @@ export default function MainLayout({
 
           <div className="flex flex-col gap-1">
             <div
-              className={`px-2 py-1 rounded transition-colors ${
-                isTasksActive ? "bg-muted" : "hover:bg-muted"
-              }`}
+              className={`px-2 py-1 rounded transition-colors ${isTasksActive ? "bg-muted" : "hover:bg-muted"
+                }`}
             >
               <div className="flex items-center justify-between gap-1">
                 <div className="text-left px-2 py-1 rounded text-foreground flex items-center gap-2 flex-1">
                   <ListTodo size={18} />
-                  Tasks
+                  Task Pages
                 </div>
                 <button
                   onClick={() => createTaskPage()}
@@ -214,11 +269,10 @@ export default function MainLayout({
                 {taskPages.map((page) => (
                   <div
                     key={page.id}
-                    className={`group flex items-center justify-between rounded px-2 py-1 ${
-                      pathname === `/tasks/${page.id}`
+                    className={`group flex items-center justify-between rounded px-2 py-1 ${pathname === `/tasks/${page.id}`
                         ? "bg-muted"
                         : "hover:bg-muted/60"
-                    }`}
+                      }`}
                   >
                     <button
                       onClick={() => router.push(`/tasks/${page.id}`)}
