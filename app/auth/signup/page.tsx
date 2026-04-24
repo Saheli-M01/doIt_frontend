@@ -6,6 +6,13 @@ import { useUser } from "@/app/context/UserContext";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import Link from "next/link";
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signInWithPopup,
+  updateProfile,
+} from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
 
 function GoogleIcon() {
   return (
@@ -18,11 +25,27 @@ function GoogleIcon() {
   );
 }
 
+function getFirebaseErrorMessage(code: string): string {
+  switch (code) {
+    case "auth/email-already-in-use":
+      return "An account with this email already exists.";
+    case "auth/invalid-email":
+      return "Invalid email address.";
+    case "auth/weak-password":
+      return "Password must be at least 6 characters.";
+    case "auth/popup-closed-by-user":
+      return "Google sign-in was cancelled.";
+    default:
+      return "Something went wrong. Please try again.";
+  }
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
   const { user, setUser, isLoading } = useUser();
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
 
@@ -30,10 +53,18 @@ export default function SignupPage() {
     if (!isLoading && user) router.push("/dashboard");
   }, [user, isLoading, router]);
 
+  const saveAndRedirect = (firebaseUser: { uid: string; displayName: string | null; email: string | null }) => {
+    const userData = {
+      id: firebaseUser.uid,
+      name: firebaseUser.displayName ?? firebaseUser.email ?? "User",
+      email: firebaseUser.email ?? "",
+    };
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
+  };
+
   const handleSignup = async () => {
     setError("");
-    setSuccess("");
-
     if (!form.name || !form.email || !form.password || !form.confirm) {
       setError("Please fill in all fields.");
       return;
@@ -49,30 +80,36 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8080/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
-      });
+      const res = await createUserWithEmailAndPassword(auth, form.email, form.password);
 
-      if (!res.ok) {
-        const msg = await res.text();
-        setError(msg || "Registration failed. Please try again.");
-        return;
-      }
+      // Set display name
+      await updateProfile(res.user, { displayName: form.name });
 
-      const data = await res.json();
-      localStorage.setItem("user", JSON.stringify(data));
-      setUser(data);
-    } catch {
-      setError("Could not connect to the server. Please try again.");
+      // Send verification email
+      await sendEmailVerification(res.user);
+
+      // Sign out — user must verify email before logging in
+      await auth.signOut();
+
+      setEmailSent(true);
+    } catch (err: any) {
+      setError(getFirebaseErrorMessage(err?.code ?? ""));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignup = () => {
-    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+  const handleGoogleSignup = async () => {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      const res = await signInWithPopup(auth, googleProvider);
+      saveAndRedirect(res.user);
+    } catch (err: any) {
+      setError(getFirebaseErrorMessage(err?.code ?? ""));
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   if (isLoading || user) return null;
@@ -87,129 +124,152 @@ export default function SignupPage() {
         </div>
       </header>
 
-      {/* Form */}
       <main className="flex-1 flex items-center justify-center px-6 py-10">
         <div className="w-full max-w-sm">
-          <div className="mb-8 text-center">
-            <h1 className="text-2xl font-bold tracking-tight mb-1">Create an account</h1>
-            <p className="text-sm text-foreground-muted">Start managing your tasks with DoIt</p>
-          </div>
 
-          <div className="space-y-3">
-            {/* Google */}
-            <button
-              onClick={handleGoogleSignup}
-              className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-lg
-                         border border-border bg-surface hover:bg-muted text-foreground
-                         text-sm font-medium transition-colors duration-200"
-            >
-              <GoogleIcon />
-              Continue with Google
-            </button>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 py-1">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-foreground-muted">or</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            {/* Name */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium" htmlFor="name">Full name</label>
-              <input
-                id="name"
-                type="text"
-                placeholder="John Doe"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
-                           text-foreground placeholder:text-foreground-muted text-sm
-                           focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
-                           transition-colors duration-150"
-              />
-            </div>
-
-            {/* Email */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium" htmlFor="email">Email</label>
-              <input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
-                           text-foreground placeholder:text-foreground-muted text-sm
-                           focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
-                           transition-colors duration-150"
-              />
-            </div>
-
-            {/* Password */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium" htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                placeholder="Min. 6 characters"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
-                           text-foreground placeholder:text-foreground-muted text-sm
-                           focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
-                           transition-colors duration-150"
-              />
-            </div>
-
-            {/* Confirm Password */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium" htmlFor="confirm">Confirm password</label>
-              <input
-                id="confirm"
-                type="password"
-                placeholder="••••••••"
-                value={form.confirm}
-                onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-                onKeyDown={(e) => e.key === "Enter" && handleSignup()}
-                className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
-                           text-foreground placeholder:text-foreground-muted text-sm
-                           focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
-                           transition-colors duration-150"
-              />
-            </div>
-
-            {/* Error / Success */}
-            {error && (
-              <p className="text-sm text-error bg-error/10 border border-error/20 rounded-lg px-3 py-2">
-                {error}
+          {/* ── Email sent state ── */}
+          {emailSent ? (
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-xl font-bold mb-2">Verify your email</h1>
+              <p className="text-sm text-foreground-muted mb-6">
+                We sent a verification link to{" "}
+                <span className="text-foreground font-medium">{form.email}</span>.
+                Click the link in the email, then sign in.
               </p>
-            )}
-            {success && (
-              <p className="text-sm text-success bg-success/10 border border-success/20 rounded-lg px-3 py-2">
-                {success}
-              </p>
-            )}
-
-            {/* Submit */}
-            <button
-              onClick={handleSignup}
-              disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-dark text-white
-                         font-semibold text-sm transition-colors duration-200
-                         disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "Creating account…" : "Create account"}
-            </button>
-
-            {/* Login link */}
-            <p className="text-center text-sm text-foreground-muted pt-1">
-              Already have an account?{" "}
-              <Link href="/auth/login" className="text-primary hover:text-primary-dark font-medium transition-colors">
-                Sign in
+              <Link
+                href="/auth/login"
+                className="inline-block px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-dark
+                           text-white text-sm font-semibold transition-colors duration-200"
+              >
+                Go to Sign in
               </Link>
-            </p>
-          </div>
+            </div>
+          ) : (
+            /* ── Form state ── */
+            <>
+              <div className="mb-8 text-center">
+                <h1 className="text-2xl font-bold tracking-tight mb-1">Create an account</h1>
+                <p className="text-sm text-foreground-muted">Start managing your tasks with DoIt</p>
+              </div>
+
+              <div className="space-y-3">
+                {/* Google */}
+                <button
+                  onClick={handleGoogleSignup}
+                  disabled={googleLoading}
+                  className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-lg
+                             border border-border bg-surface hover:bg-muted text-foreground
+                             text-sm font-medium transition-colors duration-200
+                             disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <GoogleIcon />
+                  {googleLoading ? "Signing in…" : "Continue with Google"}
+                </button>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3 py-1">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-foreground-muted">or</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+
+                {/* Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium" htmlFor="name">Full name</label>
+                  <input
+                    id="name"
+                    type="text"
+                    placeholder="John Doe"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
+                               text-foreground placeholder:text-foreground-muted text-sm
+                               focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
+                               transition-colors duration-150"
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium" htmlFor="email">Email</label>
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
+                               text-foreground placeholder:text-foreground-muted text-sm
+                               focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
+                               transition-colors duration-150"
+                  />
+                </div>
+
+                {/* Password */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium" htmlFor="password">Password</label>
+                  <input
+                    id="password"
+                    type="password"
+                    placeholder="Min. 6 characters"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
+                               text-foreground placeholder:text-foreground-muted text-sm
+                               focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
+                               transition-colors duration-150"
+                  />
+                </div>
+
+                {/* Confirm */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium" htmlFor="confirm">Confirm password</label>
+                  <input
+                    id="confirm"
+                    type="password"
+                    placeholder="••••••••"
+                    value={form.confirm}
+                    onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+                    onKeyDown={(e) => e.key === "Enter" && handleSignup()}
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface
+                               text-foreground placeholder:text-foreground-muted text-sm
+                               focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
+                               transition-colors duration-150"
+                  />
+                </div>
+
+                {/* Error */}
+                {error && (
+                  <p className="text-sm text-error bg-error/10 border border-error/20 rounded-lg px-3 py-2">
+                    {error}
+                  </p>
+                )}
+
+                {/* Submit */}
+                <button
+                  onClick={handleSignup}
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-dark text-white
+                             font-semibold text-sm transition-colors duration-200
+                             disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Creating account…" : "Create account"}
+                </button>
+
+                <p className="text-center text-sm text-foreground-muted pt-1">
+                  Already have an account?{" "}
+                  <Link href="/auth/login" className="text-primary hover:text-primary-dark font-medium transition-colors">
+                    Sign in
+                  </Link>
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </main>
 

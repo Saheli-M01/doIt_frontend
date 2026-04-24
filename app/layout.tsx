@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import Script from "next/script";
 
 const geistSans = Inter({
   variable: "--font-geist-sans",
@@ -14,19 +15,19 @@ const geistMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DoIt | Smart Task Management",
+  title: "GetDoIt | Smart Task Management",
   description: "Manage your tasks efficiently and elegantly with DoIt.",
   icons: {
     icon: [
       {
         media: "(prefers-color-scheme: light)",
-        url: "/logo_light.png",
-        href: "/logo_light.png",
+        url: "/logo_dark.png",
+        href: "/logo_dark.png",
       },
       {
         media: "(prefers-color-scheme: dark)",
-        url: "/logo_dark.png",
-        href: "/logo_dark.png",
+        url: "/logo_light.png",
+        href: "/logo_light.png",
       },
     ],
   },
@@ -67,6 +68,18 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <Providers>{children}</Providers>
+
+        {/* Google Analytics */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-W7DFFXHNZ6"
+          strategy="afterInteractive"
+        />
+        <Script id="ga-script" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-W7DFFXHNZ6');
+        `}</Script>
       </body>
     </html>
   );

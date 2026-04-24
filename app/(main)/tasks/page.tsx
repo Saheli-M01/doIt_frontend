@@ -26,7 +26,9 @@ import { Dropdown, type DropdownOption } from "@/app/components/tasks/Dropdown";
 import { groupTasks } from "@/app/components/tasks/grouping";
 import { useUser } from "@/app/context/UserContext";
 import {
-  TASK_NAV_PAGES_KEY,
+  taskNavPagesKey,
+  taskItemsKey,
+  taskDetailsKey,
   type Task,
   type TaskNavPage,
   type ViewMode,
@@ -87,27 +89,28 @@ export default function TasksPage() {
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!taskPageId) {
+    if (!taskPageId || !user?.id) {
       setTasks([]);
       setDetailsById({});
       setCurrentPage(null);
       return;
     }
+    const uid = user.id;
     const load = () => {
       try {
-        const s = localStorage.getItem(`task-items-${taskPageId}`);
+        const s = localStorage.getItem(taskItemsKey(uid, taskPageId));
         setTasks(s ? (JSON.parse(s) as Task[]) : []);
       } catch {
         setTasks([]);
       }
       try {
-        const s = localStorage.getItem(`task-details-${taskPageId}`);
+        const s = localStorage.getItem(taskDetailsKey(uid, taskPageId));
         setDetailsById(s ? (JSON.parse(s) as Record<number, string>) : {});
       } catch {
         setDetailsById({});
       }
       try {
-        const s = localStorage.getItem(TASK_NAV_PAGES_KEY);
+        const s = localStorage.getItem(taskNavPagesKey(uid));
         const pages = s ? (JSON.parse(s) as TaskNavPage[]) : [];
         setCurrentPage(pages.find((p) => p.id === taskPageId) ?? null);
       } catch {
@@ -117,7 +120,7 @@ export default function TasksPage() {
     load();
     window.addEventListener("task-pages-updated", load);
     return () => window.removeEventListener("task-pages-updated", load);
-  }, [taskPageId]);
+  }, [taskPageId, user?.id]);
 
   useEffect(() => {
     setExpandedGroups(new Set());
@@ -157,8 +160,8 @@ export default function TasksPage() {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const persistTasks = (next: Task[]) => {
     setTasks(next);
-    if (taskPageId)
-      localStorage.setItem(`task-items-${taskPageId}`, JSON.stringify(next));
+    if (taskPageId && user?.id)
+      localStorage.setItem(taskItemsKey(user.id, taskPageId), JSON.stringify(next));
   };
 
   const addTask = () => {
@@ -200,8 +203,8 @@ export default function TasksPage() {
     const next = { ...detailsById };
     delete next[id];
     setDetailsById(next);
-    if (taskPageId)
-      localStorage.setItem(`task-details-${taskPageId}`, JSON.stringify(next));
+    if (taskPageId && user?.id)
+      localStorage.setItem(taskDetailsKey(user.id, taskPageId), JSON.stringify(next));
   };
 
   const openDetailsSlider = (taskId: number) => {
@@ -210,22 +213,22 @@ export default function TasksPage() {
   };
 
   const saveDetails = () => {
-    if (openDetailsTaskId === null || !taskPageId) return;
+    if (openDetailsTaskId === null || !taskPageId || !user?.id) return;
     const updated = { ...detailsById, [openDetailsTaskId]: detailsDraft };
     setDetailsById(updated);
-    localStorage.setItem(`task-details-${taskPageId}`, JSON.stringify(updated));
+    localStorage.setItem(taskDetailsKey(user.id, taskPageId), JSON.stringify(updated));
     setOpenDetailsTaskId(null);
   };
 
   const savePageTitle = () => {
-    if (!taskPageId) return;
+    if (!taskPageId || !user?.id) return;
     const next = pageTitleInput.trim();
     if (!next) return;
     try {
-      const s = localStorage.getItem(TASK_NAV_PAGES_KEY);
+      const s = localStorage.getItem(taskNavPagesKey(user.id));
       const pages = s ? (JSON.parse(s) as TaskNavPage[]) : [];
       localStorage.setItem(
-        TASK_NAV_PAGES_KEY,
+        taskNavPagesKey(user.id),
         JSON.stringify(
           pages.map((p) => (p.id === taskPageId ? { ...p, name: next } : p)),
         ),
@@ -675,11 +678,11 @@ export default function TasksPage() {
 
             // 2 page name update
             try {
-              const s = localStorage.getItem(TASK_NAV_PAGES_KEY);
+              const s = localStorage.getItem(taskNavPagesKey(user.id));
               const pages = s ? JSON.parse(s) : [];
 
               localStorage.setItem(
-                TASK_NAV_PAGES_KEY,
+                taskNavPagesKey(user.id),
                 JSON.stringify(
                   pages.map((p: any) =>
                     p.id === taskPageId ? { ...p, name: title } : p,

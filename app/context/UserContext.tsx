@@ -9,7 +9,7 @@ import React, {
 } from "react";
 
 type User = {
-  id: number;
+  id: string | number;
   name?: string;
   email?: string;
 };

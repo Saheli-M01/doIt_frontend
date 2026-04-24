@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import type { Task } from "@/app/components/tasks/types";
+import { taskNavPagesKey, taskItemsKey } from "@/app/components/tasks/types";
 
 type TaskNavPage = {
   id: string;
@@ -43,8 +44,19 @@ export default function MainLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { user, setUser, isLoading } = useUser();
-  const [taskPages, setTaskPages] = useState<TaskNavPage[]>(readTaskNavPages);
+  const [taskPages, setTaskPages] = useState<TaskNavPage[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Load task pages scoped to this user once user is known
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const stored = localStorage.getItem(taskNavPagesKey(user.id));
+      setTaskPages(stored ? (JSON.parse(stored) as TaskNavPage[]) : []);
+    } catch {
+      setTaskPages([]);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -60,17 +72,24 @@ export default function MainLayout({
   }
   useEffect(() => {
     const onTaskPagesUpdated = () => {
-      setTaskPages(readTaskNavPages());
+      if (!user) return;
+      try {
+        const stored = localStorage.getItem(taskNavPagesKey(user.id));
+        setTaskPages(stored ? (JSON.parse(stored) as TaskNavPage[]) : []);
+      } catch {
+        setTaskPages([]);
+      }
     };
 
     window.addEventListener("task-pages-updated", onTaskPagesUpdated);
     return () => {
       window.removeEventListener("task-pages-updated", onTaskPagesUpdated);
     };
-  }, []);
+  }, [user]);
 
   const persistTaskPages = (pages: TaskNavPage[]) => {
-    localStorage.setItem(TASK_NAV_PAGES_KEY, JSON.stringify(pages));
+    if (!user) return;
+    localStorage.setItem(taskNavPagesKey(user.id), JSON.stringify(pages));
     window.dispatchEvent(new Event("task-pages-updated"));
   };
 
@@ -88,7 +107,7 @@ export default function MainLayout({
     setTaskPages(updated);
     persistTaskPages(updated);
     if (generatedTasks.length > 0) {
-      localStorage.setItem(`task-items-${id}`, JSON.stringify(generatedTasks));
+      localStorage.setItem(taskItemsKey(user.id, id), JSON.stringify(generatedTasks));
     }
     router.push(`/tasks/${id}`);
   };

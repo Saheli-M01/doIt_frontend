@@ -5,6 +5,8 @@ import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -21,20 +23,20 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8080/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!res.ok) {
-        setError("Something went wrong. Please try again.");
-        return;
-      }
-
+      await sendPasswordResetEmail(auth, email);
       setSent(true);
-    } catch {
-      setError("Could not connect to the server. Please try again.");
+    } catch (err: any) {
+      switch (err?.code) {
+        case "auth/user-not-found":
+          // Don't reveal if email exists — just show success
+          setSent(true);
+          break;
+        case "auth/invalid-email":
+          setError("Invalid email address.");
+          break;
+        default:
+          setError("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -50,7 +52,6 @@ export default function ForgotPasswordPage() {
         </div>
       </header>
 
-      {/* Form */}
       <main className="flex-1 flex items-center justify-center px-6">
         <div className="w-full max-w-sm">
           {sent ? (
@@ -63,8 +64,9 @@ export default function ForgotPasswordPage() {
               </div>
               <h1 className="text-xl font-bold mb-2">Check your inbox</h1>
               <p className="text-sm text-foreground-muted mb-6">
-                We sent a password reset link to <span className="text-foreground font-medium">{email}</span>.
-                Check your spam folder if you don&apos;t see it.
+                If an account exists for{" "}
+                <span className="text-foreground font-medium">{email}</span>,
+                a reset link has been sent. Check your spam folder too.
               </p>
               <Link
                 href="/auth/login"

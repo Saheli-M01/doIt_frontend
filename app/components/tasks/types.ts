@@ -22,4 +22,12 @@ export const PRIORITY_CONFIG: Record<
   low:    { label: "Low",    color: "var(--color-success)", bg: "color-mix(in srgb, var(--color-success) 12%, transparent)" },
 };
 
-export const TASK_NAV_PAGES_KEY = "task-nav-pages";
+/** Returns the localStorage key scoped to a specific user */
+export const taskNavPagesKey = (userId: string | number) =>
+  `task-nav-pages-${userId}`;
+
+export const taskItemsKey = (userId: string | number, pageId: string) =>
+  `task-items-${userId}-${pageId}`;
+
+export const taskDetailsKey = (userId: string | number, pageId: string) =>
+  `task-details-${userId}-${pageId}`;

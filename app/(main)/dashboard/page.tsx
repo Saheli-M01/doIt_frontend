@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import type { Task, TaskNavPage } from "@/app/components/tasks/types";
+import { taskNavPagesKey, taskItemsKey } from "@/app/components/tasks/types";
 
 const TASK_NAV_PAGES_KEY = "task-nav-pages";
 
@@ -34,20 +35,20 @@ function formatDate(value: string): string {
   });
 }
 
-function readTaskPages(): TaskNavPage[] {
+function readTaskPages(userId: string | number): TaskNavPage[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(TASK_NAV_PAGES_KEY);
+    const raw = localStorage.getItem(taskNavPagesKey(userId));
     return raw ? (JSON.parse(raw) as TaskNavPage[]) : [];
   } catch {
     return [];
   }
 }
 
-function readTasksByPage(pageId: string): Task[] {
+function readTasksByPage(userId: string | number, pageId: string): Task[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(`task-items-${pageId}`);
+    const raw = localStorage.getItem(taskItemsKey(userId, pageId));
     return raw ? (JSON.parse(raw) as Task[]) : [];
   } catch {
     return [];
@@ -59,15 +60,16 @@ export default function DashboardPage() {
   const today = startOfToday();
 
   const allTasks = useMemo<DashboardTask[]>(() => {
-    const pages = readTaskPages();
+    if (!user?.id) return [];
+    const pages = readTaskPages(user.id);
     return pages.flatMap((page) =>
-      readTasksByPage(page.id).map((task) => ({
+      readTasksByPage(user.id, page.id).map((task) => ({
         ...task,
         pageId: page.id,
         pageName: page.name,
       })),
     );
-  }, []);
+  }, [user?.id]);
 
   const sortedByDate = useMemo(
     () =>

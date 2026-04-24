@@ -71,7 +71,7 @@ export default function AIChat({
     if (!prompt.trim()) return;
     setLoading(true);
 
-    const res = await fetch(`http://localhost:8080/api/ai/generate/${userId}`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}api/ai/generate/${userId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
