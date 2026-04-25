@@ -134,7 +134,6 @@ export default function DashboardPage() {
   });
   const recentDone = sortedByDate
     .filter((task) => task.completed)
-    .slice(-5)
     .reverse();
 
   return (
@@ -280,7 +279,14 @@ export default function DashboardPage() {
           >
             <CalendarDays size={16} /> Due Today
           </h2>
-          <ul className="mt-3 space-y-2">
+          <ul 
+            className="mt-3 space-y-2 overflow-y-auto" 
+            style={{ 
+              maxHeight: "320px",
+              scrollbarWidth: "thin",
+              scrollbarColor: "var(--color-border) transparent"
+            }}
+          >
             {dueToday.length === 0 && (
               <li
                 className="text-sm"
@@ -289,7 +295,7 @@ export default function DashboardPage() {
                 No tasks due today.
               </li>
             )}
-            {dueToday.slice(0, 5).map((task) => (
+            {dueToday.map((task) => (
               <li
                 key={task.id}
                 className="rounded-lg border p-2"
@@ -326,7 +332,14 @@ export default function DashboardPage() {
           >
             <Clock3 size={16} /> Overdue
           </h2>
-          <ul className="mt-3 space-y-2">
+          <ul 
+            className="mt-3 space-y-2 overflow-y-auto" 
+            style={{ 
+              maxHeight: "320px",
+              scrollbarWidth: "thin",
+              scrollbarColor: "var(--color-border) transparent"
+            }}
+          >
             {overdue.length === 0 && (
               <li
                 className="text-sm"
@@ -335,7 +348,7 @@ export default function DashboardPage() {
                 No overdue tasks.
               </li>
             )}
-            {overdue.slice(0, 5).map((task) => (
+            {overdue.map((task) => (
               <li
                 key={task.id}
                 className="rounded-lg border p-2"
@@ -376,7 +389,14 @@ export default function DashboardPage() {
           >
             <CheckCircle2 size={16} /> Recently Completed
           </h2>
-          <ul className="mt-3 space-y-2">
+          <ul 
+            className="mt-3 space-y-2 overflow-y-auto" 
+            style={{ 
+              maxHeight: "320px",
+              scrollbarWidth: "thin",
+              scrollbarColor: "var(--color-border) transparent"
+            }}
+          >
             {recentDone.length === 0 && (
               <li
                 className="text-sm"

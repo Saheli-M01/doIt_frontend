@@ -6,6 +6,7 @@ import { useUser } from "@/app/context/UserContext";
 import AIChat from "@/app/components/AIChat/AIChat";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
+import { ContactModal } from "@/app/components/ContactModal";
 import { resolveBackendUserId } from "@/lib/backendUser";
 import Link from "next/link";
 import {
@@ -16,6 +17,7 @@ import {
   Trash2,
   Menu,
   X,
+  Mail,
 } from "lucide-react";
 import type { Task } from "@/app/components/tasks/types";
 import {
@@ -39,6 +41,7 @@ export default function MainLayout({
   const { user, setUser, isLoading } = useUser();
   const [taskPages, setTaskPages] = useState<TaskNavPage[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   // Load task pages from backend for this user
   useEffect(() => {
@@ -193,6 +196,8 @@ export default function MainLayout({
 
   return (
     <div className="flex min-h-screen relative w-full overflow-hidden">
+      {contactOpen && <ContactModal onClose={() => setContactOpen(false)} />}
+
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
@@ -306,12 +311,22 @@ export default function MainLayout({
         </div>
 
         <button
+          onClick={() => setContactOpen(true)}
+          className="px-4 py-2 rounded text-foreground-muted hover:bg-muted hover:text-foreground transition-colors text-left flex items-center gap-2 text-sm"
+        >
+          <Mail size={16} />
+          Contact
+        </button>
+
+        <button
           onClick={handleLogout}
           className="px-4 py-2 rounded text-error hover:bg-muted transition-colors text-left flex items-center gap-2"
         >
           <LogOut size={18} />
           Logout
         </button>
+
+        
       </aside>
 
       {/* Main Content */}
