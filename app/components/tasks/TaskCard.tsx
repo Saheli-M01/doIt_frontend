@@ -9,6 +9,7 @@ import {
   Plus,
   Save,
   X,
+  Check 
 } from "lucide-react";
 
 import { PRIORITY_CONFIG, type Task } from "./types";
@@ -89,7 +90,7 @@ export function TaskCard({
             }
           `}
         >
-          {isSelected && <span className="text-[10px]">✓</span>}
+          {isSelected && <span className="text-[10px]"><Check size={12}/></span>}
         </button>
       )}
 
@@ -184,7 +185,7 @@ export function TaskCard({
       {/* Delete */}
       <button
         onClick={() => onDelete(task.id)}
-        className="p-1.5 rounded-md border border-red-300 text-red-500 hover:bg-red-500 hover:text-white transition"
+        className="w-6 h-6 flex items-center justify-center rounded-full border border-red-300 text-red-500 hover:bg-red-500 hover:text-white transition"
       >
         <X size={16} />
       </button>

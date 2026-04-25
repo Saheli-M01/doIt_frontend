@@ -262,11 +262,19 @@ export default function TasksPage() {
     updateTask({ ...task, completed: !task.completed });
 
   const deleteTask = async (id: number) => {
-    await fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" });
-    persistTasks(tasks.filter((t) => t.id !== id));
-    const next = { ...detailsById };
-    delete next[id];
-    setDetailsById(next);
+    try {
+      const res = await fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        console.error("Failed to delete task");
+        return;
+      }
+      persistTasks(tasks.filter((t) => t.id !== id));
+      const next = { ...detailsById };
+      delete next[id];
+      setDetailsById(next);
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
   };
 
   const openDetailsSlider = (taskId: number) => {
@@ -659,9 +667,20 @@ export default function TasksPage() {
         <BulkBar
           count={selectedTasks.length}
           onRepeat={repeatTasks}
-          onDelete={() => {
-            persistTasks(tasks.filter((t) => !selectedTasks.includes(t.id)));
-            setSelectedTasks([]);
+          onDelete={async () => {
+            try {
+              // Delete all selected tasks from backend
+              await Promise.all(
+                selectedTasks.map((id) =>
+                  fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" })
+                )
+              );
+              // Update UI after successful deletion
+              persistTasks(tasks.filter((t) => !selectedTasks.includes(t.id)));
+              setSelectedTasks([]);
+            } catch (error) {
+              console.error("Error deleting tasks:", error);
+            }
           }}
         />
 
