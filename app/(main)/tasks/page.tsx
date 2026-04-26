@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import {
   AlertCircle,
@@ -23,6 +23,7 @@ import { BulkBar } from "@/app/components/tasks/BulkBar";
 import { Button, Card, Input } from "@/app/components/tasks/ui";
 import { DatePicker } from "@/app/components/tasks/DatePicker";
 import { Dropdown, type DropdownOption } from "@/app/components/tasks/Dropdown";
+import { Skeleton } from "@/components/ui/skeleton";
 import { groupTasks } from "@/app/components/tasks/grouping";
 import { useUser } from "@/app/context/UserContext";
 import { resolveBackendUserId } from "@/lib/backendUser";
@@ -81,11 +82,17 @@ export default function TasksPage() {
   const [isRenamingPage, setIsRenamingPage] = useState(false);
   const [pageTitleInput, setPageTitleInput] = useState("");
 
-  const [openDetailsTaskId, setOpenDetailsTaskId] = useState<number | null>(
-    null,
-  );
+  const [openDetailsTaskId, setOpenDetailsTaskId] = useState<number | null>(null);
   const [detailsDraft, setDetailsDraft] = useState("<p>Add details...</p>");
   const [backendUserId, setBackendUserId] = useState<number | null>(null);
+
+  // ── Loading / mutation guards ──────────────────────────────────────────────
+  const [isLoading, setIsLoading] = useState(true); // true by default — avoids flash of empty
+  const [isAdding, setIsAdding] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
+  const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
+  const [savingEditId, setSavingEditId] = useState<number | null>(null);
+  const addLockRef = useRef(false); // prevents double-submit
 
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -104,13 +111,22 @@ export default function TasksPage() {
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!taskPageId || !user?.id || !backendUserId || !/^\d+$/.test(taskPageId)) {
+    // backendUserId not yet resolved — stay in loading state, don't show empty
+    if (!taskPageId || !user?.id || !/^\d+$/.test(taskPageId)) {
       setTasks([]);
       setDetailsById({});
       setCurrentPage(null);
+      setIsLoading(false);
       return;
     }
+    if (!backendUserId) {
+      // still resolving — keep skeleton showing
+      setIsLoading(true);
+      return;
+    }
+    setIsLoading(true);
     const load = async () => {
+      setIsLoading(true);
       try {
         const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`);
         if (!res.ok) throw new Error("Failed to load tasks");
@@ -125,13 +141,6 @@ export default function TasksPage() {
             priority: t.priority,
           })) as Task[];
         setTasks(pageTasks);
-      } catch {
-        setTasks([]);
-      }
-      try {
-        const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`);
-        if (!res.ok) throw new Error("Failed to load task details");
-        const allTasks = await res.json();
         const pageDetails: Record<number, string> = {};
         (allTasks ?? []).forEach((t: any) => {
           if (String(t?.taskPage?.id ?? "") === taskPageId && t.id) {
@@ -140,6 +149,7 @@ export default function TasksPage() {
         });
         setDetailsById(pageDetails);
       } catch {
+        setTasks([]);
         setDetailsById({});
       }
       try {
@@ -154,6 +164,8 @@ export default function TasksPage() {
         );
       } catch {
         setCurrentPage(null);
+      } finally {
+        setIsLoading(false);
       }
     };
     void load();
@@ -202,28 +214,36 @@ export default function TasksPage() {
 
   const addTask = async () => {
     if (!taskPageId || !title.trim() || !backendUserId || !/^\d+$/.test(taskPageId)) return;
+    if (addLockRef.current || isAdding) return; // prevent double submit
+    addLockRef.current = true;
+    setIsAdding(true);
     const today = new Date().toISOString().split("T")[0];
     const taskDate = date || today;
-    const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: title.trim(),
-        completed: false,
-        date: taskDate,
-        priority,
-        details: "",
-        taskPageId: Number(taskPageId),
-      }),
-    });
-    if (!res.ok) return;
-    const created = await res.json();
-    persistTasks([
-      { id: created.id, title: created.title, completed: created.completed, date: created.date, priority: created.priority },
-      ...tasks,
-    ]);
-    setTitle("");
-    setDate("");
+    try {
+      const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          completed: false,
+          date: taskDate,
+          priority,
+          details: "",
+          taskPageId: Number(taskPageId),
+        }),
+      });
+      if (!res.ok) return;
+      const created = await res.json();
+      persistTasks([
+        { id: created.id, title: created.title, completed: created.completed, date: created.date, priority: created.priority },
+        ...tasks,
+      ]);
+      setTitle("");
+      setDate("");
+    } finally {
+      setIsAdding(false);
+      addLockRef.current = false;
+    }
   };
 
   const updateTask = async (task: Task) => {
@@ -249,33 +269,46 @@ export default function TasksPage() {
   };
 
   const saveEditedTask = async (task: Task) => {
-    if (!editText.trim()) return;
+    if (!editText.trim() || savingEditId === task.id) return;
+    setSavingEditId(task.id);
     const today = new Date().toISOString().split("T")[0];
-    await updateTask({
-      ...task,
-      title: editText.trim(),
-      date: editDate || today,
-      priority: editPriority,
-    });
-    setEditingId(null);
+    try {
+      await updateTask({
+        ...task,
+        title: editText.trim(),
+        date: editDate || today,
+        priority: editPriority,
+      });
+      setEditingId(null);
+    } finally {
+      setSavingEditId(null);
+    }
   };
 
-  const toggleTask = async (task: Task) =>
-    updateTask({ ...task, completed: !task.completed });
+  const toggleTask = async (task: Task) => {
+    if (togglingIds.has(task.id)) return;
+    setTogglingIds(prev => new Set(prev).add(task.id));
+    try {
+      await updateTask({ ...task, completed: !task.completed });
+    } finally {
+      setTogglingIds(prev => { const s = new Set(prev); s.delete(task.id); return s; });
+    }
+  };
 
   const deleteTask = async (id: number) => {
+    if (deletingIds.has(id)) return;
+    setDeletingIds(prev => new Set(prev).add(id));
     try {
       const res = await fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        console.error("Failed to delete task");
-        return;
-      }
+      if (!res.ok) { console.error("Failed to delete task"); return; }
       persistTasks(tasks.filter((t) => t.id !== id));
       const next = { ...detailsById };
       delete next[id];
       setDetailsById(next);
     } catch (error) {
       console.error("Error deleting task:", error);
+    } finally {
+      setDeletingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
     }
   };
 
@@ -386,56 +419,23 @@ export default function TasksPage() {
     setEditText,
     setEditDate,
     setEditPriority,
+    deletingIds,
+    togglingIds,
+    savingEditId,
   };
 
   // ── Empty state ────────────────────────────────────────────────────────────
   if (!taskPageId) {
     return (
       <>
-        <div
-          style={{
-            minHeight: "60vh",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 16,
-            background: "var(--color-surface)",
-            border: "1.5px dashed var(--color-border)",
-            borderRadius: 20,
-            padding: 48,
-          }}
-        >
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 18,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background:
-                "color-mix(in srgb, var(--color-primary) 12%, transparent)",
-              border:
-                "1.5px solid color-mix(in srgb, var(--color-primary) 30%, transparent)",
-            }}
-          >
-            <LayoutList size={28} color="var(--color-primary)" />
+        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 bg-surface border-2 border-dashed border-border rounded-2xl p-12">
+          <div className="w-16 h-16 rounded-[18px] flex items-center justify-center bg-primary/12 border border-primary/30">
+            <LayoutList size={28} className="text-primary" />
           </div>
-          <p
-            style={{
-              color: "var(--color-foreground-muted)",
-              fontSize: 16,
-              textAlign: "center",
-              maxWidth: 320,
-            }}
-          >
-            Use the{" "}
-            <strong style={{ color: "var(--color-foreground)" }}>+</strong> icon
-            beside Tasks to create and open a new page.
+          <p className="text-foreground-muted text-base text-center max-w-xs">
+            Use the <strong className="text-foreground">+</strong> icon beside Tasks to create and open a new page.
           </p>
         </div>
-
         {user?.id && <AIChat userId={String(user.id)} mode="floating" />}
       </>
     );
@@ -443,18 +443,21 @@ export default function TasksPage() {
 
   return (
     <>
-      <div style={{ maxWidth: 860, margin: "0 auto", paddingBottom: 80 }}>
+      <div className="max-w-[1060px] mx-auto pb-20">
+
         {/* ── Page Header ── */}
-        <div style={{ marginBottom: 24 }}>
-          {isRenamingPage ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
+        <div className="mb-6">
+          {isLoading ? (
+            <div className="flex flex-col gap-3">
+              <Skeleton className="h-9 w-52 rounded-lg" />
+              <div className="flex gap-2">
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </div>
+            </div>
+          ) : isRenamingPage ? (
+            <div className="flex items-center gap-2.5 flex-wrap">
               <Input
                 value={pageTitleInput}
                 onChange={(e) => setPageTitleInput(e.target.value)}
@@ -463,205 +466,87 @@ export default function TasksPage() {
                 autoFocus
                 style={{ fontSize: 22, fontWeight: 800, minWidth: 220 }}
               />
-              <Button onClick={savePageTitle}>
-                <Save size={14} /> Save
-              </Button>
-              <Button variant="ghost" onClick={() => setIsRenamingPage(false)}>
-                Cancel
-              </Button>
+              <Button onClick={savePageTitle}><Save size={14} /> Save</Button>
+              <Button variant="ghost" onClick={() => setIsRenamingPage(false)}>Cancel</Button>
             </div>
           ) : (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <h1
-                style={{
-                  fontSize: "clamp(22px, 5vw, 32px)",
-                  fontWeight: 900,
-                  margin: 0,
-                  color: "var(--color-foreground)",
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                {currentPage?.name ?? "Task Page"}
-              </h1>
-              <button
-                onClick={() => {
-                  setPageTitleInput(currentPage?.name ?? "");
-                  setIsRenamingPage(true);
-                }}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--color-primary)",
-                  background:
-                    "color-mix(in srgb, var(--color-primary) 10%, transparent)",
-                  border:
-                    "1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)",
-                  padding: "5px 12px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              >
-                <Pencil size={12} /> Rename
-              </button>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              {/* Left: title + rename */}
+              <div className="flex items-center gap-3">
+                <h1 className="text-[clamp(22px,5vw,32px)] font-black tracking-tight text-foreground m-0">
+                  {currentPage?.name ?? "Task Page"}
+                </h1>
+                <button
+                  onClick={() => { setPageTitleInput(currentPage?.name ?? ""); setIsRenamingPage(true); }}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 border border-primary/25 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors"
+                >
+                  <Pencil size={12} /> Rename
+                </button>
+              </div>
+              {/* Right: stat pills */}
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { icon: <LayoutList size={12} />, label: `${stats.total} tasks`, cls: "text-primary bg-primary/10 border-primary/25" },
+                  { icon: <CheckCircle2 size={12} />, label: `${stats.done} done`, cls: "text-green-500 bg-green-500/10 border-green-500/25" },
+                  { icon: <AlertCircle size={12} />, label: `${stats.urgent} urgent`, cls: "text-red-500 bg-red-500/10 border-red-500/25" },
+                ].map(({ icon, label, cls }) => (
+                  <span key={label} className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${cls}`}>
+                    {icon} {label}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
-
-          {/* Stat pills */}
-          <div
-            style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}
-          >
-            {[
-              {
-                icon: <LayoutList size={12} />,
-                label: `${stats.total} tasks`,
-                token: "primary",
-              },
-              {
-                icon: <CheckCircle2 size={12} />,
-                label: `${stats.done} done`,
-                token: "success",
-              },
-              {
-                icon: <AlertCircle size={12} />,
-                label: `${stats.urgent} urgent`,
-                token: "error",
-              },
-            ].map(({ icon, label, token }) => (
-              <span
-                key={label}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: `var(--color-${token})`,
-                  background: `color-mix(in srgb, var(--color-${token}) 10%, transparent)`,
-                  padding: "4px 12px",
-                  borderRadius: 20,
-                  border: `1px solid color-mix(in srgb, var(--color-${token}) 25%, transparent)`,
-                }}
-              >
-                {icon} {label}
-              </span>
-            ))}
-          </div>
         </div>
-
         {/* ── Add Task ── */}
         <Card style={{ marginBottom: 20 }}>
-          <p
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              color: "var(--color-foreground-muted)",
-              marginBottom: 12,
-            }}
-          >
-            New Task
-          </p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div className="flex gap-2.5 flex-wrap items-center">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-foreground-muted whitespace-nowrap">New Task</p>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addTask()}
               placeholder="What needs to be done?"
-              style={{ flex: "1 1 200px" }}
+              style={{ flex: "1 1 160px" }}
             />
-            <DatePicker
-              value={date}
-              onChange={setDate}
-              placeholder="Due date"
-            />
+            <DatePicker value={date} onChange={setDate} placeholder="Due date" />
             <Dropdown
               value={priority}
               options={PRIORITY_OPTIONS}
               onChange={(next) => setPriority(next as Task["priority"])}
               style={{ minWidth: 138 }}
             />
-            <Button onClick={addTask} disabled={!title.trim()}>
-              <Plus size={17} /> Add Task
+            <Button onClick={addTask} disabled={!title.trim() || isAdding}>
+              {isAdding
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <Plus size={17} />
+              }
+              {isAdding ? "Adding…" : "Add Task"}
             </Button>
           </div>
         </Card>
 
         {/* ── Controls ── */}
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            marginBottom: 14,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
-          {/* Search */}
-          <div style={{ position: "relative", flex: "1 1 160px" }}>
-            <Search
-              size={14}
-              style={{
-                position: "absolute",
-                left: 11,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--color-foreground-muted)",
-                pointerEvents: "none",
-              }}
-            />
+        <div className="flex gap-2.5 mb-3.5 items-center overflow-x-auto">
+          <div className="relative flex-1 min-w-36">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks..."
-              style={{
-                width: "100%",
-                paddingLeft: 34,
-                boxSizing: "border-box",
-              }}
+              style={{ width: "100%", paddingLeft: 34, boxSizing: "border-box" }}
             />
           </div>
-
-          <Dropdown
-            value={priorityFilter}
-            options={PRIORITY_FILTER_OPTIONS}
-            onChange={setPriorityFilter}
-            style={{ minWidth: 160 }}
-          />
-
-          <Dropdown
-            value={dateSort}
-            options={DATE_SORT_OPTIONS}
-            onChange={setDateSort}
-            style={{ minWidth: 152 }}
-          />
-
+          <Dropdown value={priorityFilter} options={PRIORITY_FILTER_OPTIONS} onChange={setPriorityFilter} style={{ minWidth: 160 }} />
+          <Dropdown value={dateSort} options={DATE_SORT_OPTIONS} onChange={setDateSort} style={{ minWidth: 152 }} />
           <ViewToggle value={viewMode} onChange={setViewMode} />
-
           <Button
             variant="ghost"
-            onClick={() =>
-              selectedTasks.length === filteredTasks.length
-                ? setSelectedTasks([])
-                : setSelectedTasks(filteredTasks.map((t) => t.id))
-            }
-            style={{ fontSize: 12, whiteSpace: "nowrap" }}
+            onClick={() => selectedTasks.length === filteredTasks.length ? setSelectedTasks([]) : setSelectedTasks(filteredTasks.map(t => t.id))}
+            style={{ fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}
           >
             <CheckCheck size={14} />
-            {filteredTasks.length > 0 &&
-            selectedTasks.length === filteredTasks.length
-              ? "Deselect All"
-              : "Select All"}
+            {filteredTasks.length > 0 && selectedTasks.length === filteredTasks.length ? "Deselect All" : "Select All"}
           </Button>
         </div>
 
@@ -671,99 +556,93 @@ export default function TasksPage() {
           onRepeat={repeatTasks}
           onDelete={async () => {
             try {
-              // Delete all selected tasks from backend
-              await Promise.all(
-                selectedTasks.map((id) =>
-                  fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" })
-                )
-              );
-              // Update UI after successful deletion
-              persistTasks(tasks.filter((t) => !selectedTasks.includes(t.id)));
+              await Promise.all(selectedTasks.map(id => fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" })));
+              persistTasks(tasks.filter(t => !selectedTasks.includes(t.id)));
               setSelectedTasks([]);
-            } catch (error) {
-              console.error("Error deleting tasks:", error);
-            }
+            } catch (error) { console.error("Error deleting tasks:", error); }
           }}
         />
 
         {/* ── All view ── */}
         {viewMode === "all" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filteredTasks.length === 0 && (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "56px 0",
-                  color: "var(--color-foreground-muted)",
-                  fontSize: 15,
-                }}
-              >
-                <Clock
-                  size={32}
-                  style={{
-                    margin: "0 auto 12px",
-                    display: "block",
-                    opacity: 0.4,
-                  }}
-                />
+          <div className="flex flex-col gap-2.5">
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex gap-3 px-3 py-2.5 rounded-xl border border-border bg-surface">
+                  <Skeleton className="w-4 h-4 mt-1 rounded shrink-0" />
+                  <Skeleton className="w-5 h-5 mt-1 rounded-full shrink-0" />
+                  <div className="flex-1 flex flex-col gap-2">
+                    <Skeleton className="h-4 w-3/4 rounded" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-5 w-14 rounded-full" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                      <Skeleton className="h-5 w-10 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : filteredTasks.length === 0 ? (
+              <div className="text-center py-14 text-foreground-muted text-[15px]">
+                <Clock size={32} className="mx-auto mb-3 opacity-40" />
                 No tasks found
               </div>
+            ) : (
+              filteredTasks.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  {...taskCardProps}
+                  details={detailsById[task.id]}
+                  isSelected={selectedTasks.includes(task.id)}
+                  onSelect={() => toggleSelectTask(task.id)}
+                />
+              ))
             )}
-            {filteredTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                {...taskCardProps}
-                details={detailsById[task.id]}
-                isSelected={selectedTasks.includes(task.id)}
-                onSelect={() => toggleSelectTask(task.id)}
-              />
-            ))}
           </div>
         )}
 
         {/* ── Grouped views ── */}
         {viewMode !== "all" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {groups.length === 0 && (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "56px 0",
-                  color: "var(--color-foreground-muted)",
-                  fontSize: 15,
-                }}
-              >
-                <Clock
-                  size={32}
-                  style={{
-                    margin: "0 auto 12px",
-                    display: "block",
-                    opacity: 0.4,
-                  }}
-                />
+          <div className="flex flex-col gap-2.5">
+            {isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-border bg-surface overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-4 h-4 rounded" />
+                      <Skeleton className="h-4 w-24 rounded" />
+                      <Skeleton className="h-5 w-14 rounded-full" />
+                    </div>
+                    <Skeleton className="h-3 w-16 rounded" />
+                  </div>
+                </div>
+              ))
+            ) : groups.length === 0 ? (
+              <div className="text-center py-14 text-foreground-muted text-[15px]">
+                <Clock size={32} className="mx-auto mb-3 opacity-40" />
                 No tasks found
               </div>
+            ) : (
+              groups.map(({ key, tasks: groupedTasks }) => (
+                <GroupCard
+                  key={key}
+                  groupKey={key}
+                  tasks={groupedTasks}
+                  isOpen={expandedGroups.has(key)}
+                  onToggle={() => toggleGroup(key)}
+                  selectedTasks={selectedTasks}
+                  taskCardProps={taskCardProps}
+                  onSelectTask={toggleSelectTask}
+                  detailsById={detailsById}
+                />
+              ))
             )}
-            {groups.map(({ key, tasks: groupedTasks }) => (
-              <GroupCard
-                key={key}
-                groupKey={key}
-                tasks={groupedTasks}
-                isOpen={expandedGroups.has(key)}
-                onToggle={() => toggleGroup(key)}
-                selectedTasks={selectedTasks}
-                taskCardProps={taskCardProps}
-                onSelectTask={toggleSelectTask}
-                detailsById={detailsById}
-              />
-            ))}
           </div>
         )}
 
         {/* ── Details Slider ── */}
         <DetailsSlider
-          task={tasks.find((t) => t.id === openDetailsTaskId)}
+          task={tasks.find(t => t.id === openDetailsTaskId)}
           draft={detailsDraft}
           isOpen={openDetailsTaskId !== null}
           onClose={() => setOpenDetailsTaskId(null)}
@@ -843,7 +722,7 @@ export default function TasksPage() {
               }
 
               window.dispatchEvent(new Event("task-pages-updated"));
-            } catch {}
+            } catch { }
           }}
         />
       )}

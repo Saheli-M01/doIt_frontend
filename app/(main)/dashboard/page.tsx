@@ -2,532 +2,296 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  ListTodo,
-  Target,
-} from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, ListTodo, Target } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import type { Task } from "@/app/components/tasks/types";
 import { resolveBackendUserId } from "@/lib/backendUser";
+import { Skeleton } from "@/components/ui/skeleton";
 
-type DashboardTask = Task & {
-  pageId: string;
-  pageName: string;
-};
+type DashboardTask = Task & { pageId: string; pageName: string };
 
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+function ymd(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function parseYMD(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return parseYMD(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+// ── Heatmap ────────────────────────────────────────────────────────────────
+const WEEKS = 53;
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function buildGrid(tasks: DashboardTask[]) {
+  // count completed tasks per date
+  const counts: Record<string, number> = {};
+  for (const t of tasks) {
+    if (!t.completed) continue;
+    counts[t.date] = (counts[t.date] ?? 0) + 1;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // today is always the LAST cell — walk back WEEKS*7-1 days for the first cell
+  const totalCells = WEEKS * 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - (totalCells - 1));
+
+  const cells: { date: Date; count: number; isFuture: boolean }[] = [];
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    cells.push({ date: d, count: counts[ymd(d)] ?? 0, isFuture: d > today });
+  }
+
+  // reshape into weeks of 7
+  const weeks = Array.from({ length: WEEKS }, (_, w) => cells.slice(w * 7, w * 7 + 7));
+
+  // month label: first week where month changes
+  const monthLabels: { weekIdx: number; label: string }[] = [];
+  let lastMonth = -1;
+  weeks.forEach((week, wi) => {
+    const m = week[0].date.getMonth();
+    if (m !== lastMonth) { monthLabels.push({ weekIdx: wi, label: MONTH_NAMES[m] }); lastMonth = m; }
+  });
+
+  const max = Math.max(1, ...Object.values(counts));
+  return { weeks, monthLabels, max };
+}
+
+function cellColor(count: number, max: number, isFuture: boolean): string {
+  if (isFuture || count === 0) return "bg-muted";
+  const ratio = count / max;
+  if (ratio <= 0.25) return "bg-green-900/60";
+  if (ratio <= 0.5)  return "bg-green-700/70";
+  if (ratio <= 0.75) return "bg-green-500/80";
+  return "bg-green-400";
+}
+
+function calcStreak(tasks: DashboardTask[]): number {
+  const completedDates = new Set(tasks.filter(t => t.completed).map(t => t.date));
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let streak = 0;
+  for (let i = 0; ; i++) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    if (completedDates.has(ymd(d))) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function Heatmap({ tasks, isLoading }: { tasks: DashboardTask[]; isLoading: boolean }) {
+  const { weeks, monthLabels, max } = useMemo(() => buildGrid(tasks), [tasks]);
+  const streak = useMemo(() => calcStreak(tasks), [tasks]);
+  const totalCompleted = tasks.filter(t => t.completed).length;
+
+  return (
+    <section className="rounded-xl border border-border bg-surface p-4">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <h2 className="font-semibold flex items-center gap-2 text-foreground">
+          <CheckCircle2 size={16} className="text-green-500" />
+          Task Activity
+        </h2>
+        {!isLoading && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-foreground-muted">
+              <span className="font-semibold text-foreground">{totalCompleted}</span> completed
+            </span>
+            {streak > 0 && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-500">
+                🔥 {streak}d streak
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-24 w-full rounded-lg" />
+      ) : (
+        <div className="overflow-x-auto">
+          <div className="inline-flex gap-0">
+            {/* Day labels */}
+            <div className="flex flex-col gap-[3px] mr-1.5 pt-[18px]">
+              {["Mon","Tue","Wed","Thu","Fri","Sat", "Sun"].map((d, i) => (
+                <div key={d} className="text-[9px] text-foreground-muted leading-[12px] h-[12px] select-none" style={{ opacity: i % 2 === 0 ? 0 : 1 }}>{d}</div>
+              ))}
+            </div>
+
+            {/* Grid */}
+            <div className="flex flex-col gap-0">
+              {/* Month labels */}
+              <div className="relative h-[18px]">
+                {monthLabels.map(({ weekIdx, label }) => (
+                  <span key={`${weekIdx}-${label}`} className="absolute text-[10px] text-foreground-muted select-none" style={{ left: weekIdx * 15 }}>{label}</span>
+                ))}
+              </div>
+              {/* Cells */}
+              <div className="flex gap-[3px]">
+                {weeks.map((week, wi) => (
+                  <div key={wi} className="flex flex-col gap-[3px]">
+                    {week.map((cell, di) => (
+                      <div
+                        key={di}
+                        title={cell.isFuture ? "" : `${cell.date.toDateString()}: ${cell.count} task${cell.count !== 1 ? "s" : ""} completed`}
+                        className={`w-[12px] h-[12px] rounded-[2px] transition-opacity ${cellColor(cell.count, max, cell.isFuture)} ${cell.isFuture ? "opacity-20" : "opacity-100"}`}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[10px] text-foreground-muted">Less</span>
+            {["bg-muted","bg-green-900/60","bg-green-700/70","bg-green-500/80","bg-green-400"].map((c, i) => (
+              <div key={i} className={`w-[12px] h-[12px] rounded-[2px] ${c}`} />
+            ))}
+            <span className="text-[10px] text-foreground-muted">More</span>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useUser();
   const [allTasks, setAllTasks] = useState<DashboardTask[]>([]);
-  const today = startOfToday();
+  const [isLoading, setIsLoading] = useState(true);
+
+  const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
 
   useEffect(() => {
-    if (!user) {
-      setAllTasks([]);
-      return;
-    }
-
-    const loadDashboardData = async () => {
+    if (!user) { setAllTasks([]); setIsLoading(false); return; }
+    const load = async () => {
       try {
         const backendUserId = await resolveBackendUserId(user);
         const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
-
         const [tasksRes, pagesRes] = await Promise.all([
           fetch(`${baseUrl}/api/tasks/${backendUserId}`),
           fetch(`${baseUrl}/api/task-pages/${backendUserId}`),
         ]);
-
-        if (!tasksRes.ok || !pagesRes.ok) {
-          setAllTasks([]);
-          return;
-        }
-
+        if (!tasksRes.ok || !pagesRes.ok) { setAllTasks([]); return; }
         const tasksJson = await tasksRes.json();
         const pagesJson = await pagesRes.json();
-
         const pageNameById = new Map<string, string>(
-          (pagesJson ?? []).map((page: { id: number; name: string }) => [
-            String(page.id),
-            page.name,
-          ]),
+          (pagesJson ?? []).map((p: { id: number; name: string }) => [String(p.id), p.name]),
         );
-
-        const normalized = (tasksJson ?? []).map(
-          (task: {
-            id: number;
-            title: string;
-            completed: boolean;
-            date: string;
-            priority: "low" | "medium" | "high";
-            taskPage?: { id?: number };
-          }) => {
-            const pageId = String(task.taskPage?.id ?? "");
-            return {
-              id: task.id,
-              title: task.title,
-              completed: task.completed,
-              date: task.date,
-              priority: task.priority,
-              pageId,
-              pageName: pageNameById.get(pageId) ?? "Task Page",
-            } satisfies DashboardTask;
-          },
-        );
-
-        setAllTasks(normalized);
-      } catch {
-        setAllTasks([]);
-      }
+        setAllTasks((tasksJson ?? []).map((t: { id: number; title: string; completed: boolean; date: string; priority: "low"|"medium"|"high"; taskPage?: { id?: number } }) => {
+          const pageId = String(t.taskPage?.id ?? "");
+          return { id: t.id, title: t.title, completed: t.completed, date: t.date, priority: t.priority, pageId, pageName: pageNameById.get(pageId) ?? "Task Page" } satisfies DashboardTask;
+        }));
+      } catch { setAllTasks([]); }
+      finally { setIsLoading(false); }
     };
-
-    void loadDashboardData();
+    void load();
   }, [user]);
 
-  const sortedByDate = useMemo(
-    () =>
-      [...allTasks].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-      ),
-    [allTasks],
-  );
-
+  const sortedByDate = useMemo(() => [...allTasks].sort((a, b) => a.date.localeCompare(b.date)), [allTasks]);
   const total = allTasks.length;
-  const completed = allTasks.filter((task) => task.completed).length;
+  const completed = allTasks.filter(t => t.completed).length;
   const completionRate = total ? Math.round((completed / total) * 100) : 0;
-  const highPriorityOpen = allTasks.filter(
-    (task) => task.priority === "high" && !task.completed,
-  ).length;
-  const dueToday = allTasks.filter((task) => {
-    if (task.completed) return false;
-    const taskDate = new Date(task.date);
-    taskDate.setHours(0, 0, 0, 0);
-    return taskDate.getTime() === today.getTime();
-  });
-  const overdue = allTasks.filter((task) => {
-    if (task.completed) return false;
-    const taskDate = new Date(task.date);
-    taskDate.setHours(0, 0, 0, 0);
-    return taskDate.getTime() < today.getTime();
-  });
-  const upcoming = sortedByDate.filter((task) => {
-    if (task.completed) return false;
-    const taskDate = new Date(task.date);
-    taskDate.setHours(0, 0, 0, 0);
-    return taskDate.getTime() > today.getTime();
-  });
-  const recentDone = sortedByDate
-    .filter((task) => task.completed)
-    .reverse();
+  const highPriorityOpen = allTasks.filter(t => t.priority === "high" && !t.completed).length;
+
+  const dueToday = allTasks.filter(t => !t.completed && parseYMD(t.date).getTime() === today.getTime());
+  const overdue  = allTasks.filter(t => !t.completed && parseYMD(t.date).getTime() < today.getTime());
+  const upcoming = sortedByDate.filter(t => !t.completed && parseYMD(t.date).getTime() > today.getTime());
+  const recentDone = sortedByDate.filter(t => t.completed).reverse();
+
+  const statCards = [
+    { icon: <ListTodo size={16} />,    label: "Total Tasks",        value: total,            color: "text-primary",  bg: "bg-primary/15"  },
+    { icon: <CheckCircle2 size={16} />,label: "Completed",          value: completed,        color: "text-green-500",bg: "bg-green-500/15"},
+    { icon: <AlertTriangle size={16} />,label:"High Priority Open", value: highPriorityOpen, color: "text-red-500",  bg: "bg-red-500/15"  },
+    { icon: <Target size={16} />,      label: "Completion Rate",    value: `${completionRate}%`, color: "text-yellow-500", bg: "bg-yellow-500/15" },
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <header
-        className="rounded-2xl border p-6"
-        style={{
-          background:
-            "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)), var(--color-surface))",
-          borderColor: "var(--color-border)",
-        }}
-      >
-        <p
-          className="text-sm"
-          style={{ color: "var(--color-foreground-muted)" }}
-        >
-          Dashboard Overview
-        </p>
-        <h1
-          className="mt-2 text-3xl font-black tracking-tight"
-          style={{ color: "var(--color-foreground)" }}
-        >
-          Welcome, {user?.name || "User"}
-        </h1>
-        <p
-          className="mt-2 text-sm"
-          style={{ color: "var(--color-foreground-muted)" }}
-        >
-          {user?.email || "No email available"}
-        </p>
-      </header>
+    <div className="max-w-6xl mx-auto space-y-4 pb-8">
 
-      <section className="grid gap-4 grid-cols-2 md:grid-cols-4">
-        {[
-          {
-            icon: <ListTodo size={16} />,
-            label: "Total Tasks",
-            value: total,
-            color: "var(--color-primary)",
-          },
-          {
-            icon: <CheckCircle2 size={16} />,
-            label: "Completed",
-            value: completed,
-            color: "var(--color-success)",
-          },
-          {
-            icon: <AlertTriangle size={16} />,
-            label: "High Priority Open",
-            value: highPriorityOpen,
-            color: "var(--color-error)",
-          },
-          {
-            icon: <Target size={16} />,
-            label: "Completion Rate",
-            value: `${completionRate}%`,
-            color: "var(--color-warning)",
-          },
-        ].map((card) => (
-          <article
-            key={card.label}
-            className="rounded-xl border p-4"
-            style={{
-              background: "var(--color-surface)",
-              borderColor: "var(--color-border)",
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <p
-                className="text-xs font-semibold uppercase tracking-wide"
-                style={{ color: "var(--color-foreground-muted)" }}
-              >
-                {card.label}
-              </p>
-              <span
-                className="inline-flex items-center justify-center h-8 w-8 rounded-lg"
-                style={{
-                  color: card.color,
-                  background: `color-mix(in srgb, ${card.color} 15%, transparent)`,
-                }}
-              >
-                {card.icon}
-              </span>
-            </div>
-            <p
-              className="mt-3 text-3xl font-extrabold"
-              style={{ color: "var(--color-foreground)" }}
-            >
-              {card.value}
-            </p>
+      {/* Header + stats in one row */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+        {/* Welcome card */}
+        <header className="md:col-span-1 rounded-2xl border border-border px-4 py-3 flex flex-col justify-center bg-gradient-to-br from-primary/10 to-surface">
+      
+          <h1 className="text-lg font-black tracking-tight text-foreground leading-tight">
+            Welcome, {(user?.name || "User").split(" ")[0]}!
+          </h1>
+          <p className="mt-0.5 text-[11px] text-foreground-muted truncate">{user?.email || ""}</p>
+        </header>
+
+        {/* 4 stat cards */}
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-surface p-4">
+                <div className="flex items-center justify-between mb-3"><Skeleton className="h-3 w-24" /><Skeleton className="h-8 w-8 rounded-lg" /></div>
+                <Skeleton className="h-8 w-16" />
+              </div>
+            ))
+          : statCards.map(card => (
+              <article key={card.label} className="rounded-xl border border-border bg-surface px-4 py-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">{card.label}</p>
+                  <span className={`inline-flex items-center justify-center h-7 w-7 rounded-lg ${card.color} ${card.bg}`}>{card.icon}</span>
+                </div>
+                <p className="mt-2 text-2xl font-extrabold text-foreground">{card.value}</p>
+              </article>
+            ))
+        }
+      </div>
+
+      
+
+      {/* Heatmap */}
+      <Heatmap tasks={allTasks} isLoading={isLoading} />
+
+      {/* 4 panels */}
+      <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        {([
+          { title: "Due Today",          icon: <CalendarDays size={16} />, items: dueToday,   empty: "No tasks due today.",    isOverdue: false },
+          { title: "Overdue",            icon: <Clock3 size={16} />,       items: overdue,    empty: "No overdue tasks.",      isOverdue: true  },
+          { title: "Recently Completed", icon: <CheckCircle2 size={16} />, items: recentDone, empty: "No completed tasks yet.", isOverdue: false },
+           { title: "Upcoming", icon: <ListTodo size={16} />, items: upcoming.slice(0, 6), empty: "No upcoming tasks.", isOverdue: false },
+        ] as const).map(({ title, icon, items, empty, isOverdue }, idx) => (
+          <article key={title} className="rounded-xl border border-border bg-surface p-4">
+            <h2 className="font-semibold flex items-center gap-2 text-foreground">{icon} {title}</h2>
+            <ul className="mt-3 space-y-2 overflow-y-auto max-h-80 scrollbar-thin">
+              {isLoading
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <li key={i} className="rounded-lg border border-border p-2 space-y-1.5">
+                      <Skeleton className="h-3.5 w-3/4" /><Skeleton className="h-3 w-1/3" />
+                    </li>
+                  ))
+                : items.length === 0
+                  ? <li className="text-sm text-foreground-muted">{empty}</li>
+                  : items.map(task => (
+                      <li key={task.id} className={`rounded-lg border p-2 ${isOverdue ? "border-red-500/25 bg-red-500/7" : "border-border"}`}>
+                        <p className="text-sm font-medium text-foreground">{task.title}</p>
+                        {idx === 1
+                          ? <p className="text-xs text-foreground-muted">Due {formatDate(task.date)}</p>
+                          : idx === 2
+                            ? <p className="text-xs text-foreground-muted">{task.pageName}</p>
+                            : <Link href={`/tasks/${task.pageId}`} className="text-xs font-medium text-primary">{task.pageName}</Link>
+                        }
+                      </li>
+                    ))
+              }
+            </ul>
           </article>
         ))}
       </section>
 
-      <section
-        className="rounded-xl border p-4"
-        style={{
-          background: "var(--color-surface)",
-          borderColor: "var(--color-border)",
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <p
-            className="font-semibold"
-            style={{ color: "var(--color-foreground)" }}
-          >
-            Progress
-          </p>
-          <span
-            className="text-sm"
-            style={{ color: "var(--color-foreground-muted)" }}
-          >
-            {completed} / {total}
-          </span>
-        </div>
-        <div
-          className="mt-3 h-3 w-full rounded-full"
-          style={{ background: "var(--color-muted)" }}
-          aria-label="completion progress"
-        >
-          <div
-            className="h-3 rounded-full"
-            style={{
-              width: `${completionRate}%`,
-              background:
-                "linear-gradient(90deg, var(--color-primary), var(--color-success))",
-            }}
-          />
-        </div>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-3">
-        <article
-          className="rounded-xl border p-4"
-          style={{
-            background: "var(--color-surface)",
-            borderColor: "var(--color-border)",
-          }}
-        >
-          <h2
-            className="font-semibold flex items-center gap-2"
-            style={{ color: "var(--color-foreground)" }}
-          >
-            <CalendarDays size={16} /> Due Today
-          </h2>
-          <ul 
-            className="mt-3 space-y-2 overflow-y-auto" 
-            style={{ 
-              maxHeight: "320px",
-              scrollbarWidth: "thin",
-              scrollbarColor: "var(--color-border) transparent"
-            }}
-          >
-            {dueToday.length === 0 && (
-              <li
-                className="text-sm"
-                style={{ color: "var(--color-foreground-muted)" }}
-              >
-                No tasks due today.
-              </li>
-            )}
-            {dueToday.map((task) => (
-              <li
-                key={task.id}
-                className="rounded-lg border p-2"
-                style={{ borderColor: "var(--color-border)" }}
-              >
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: "var(--color-foreground)" }}
-                >
-                  {task.title}
-                </p>
-                <Link
-                  href={`/tasks/${task.pageId}`}
-                  className="text-xs font-medium"
-                  style={{ color: "var(--color-primary)" }}
-                >
-                  {task.pageName}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article
-          className="rounded-xl border p-4"
-          style={{
-            background: "var(--color-surface)",
-            borderColor: "var(--color-border)",
-          }}
-        >
-          <h2
-            className="font-semibold flex items-center gap-2"
-            style={{ color: "var(--color-foreground)" }}
-          >
-            <Clock3 size={16} /> Overdue
-          </h2>
-          <ul 
-            className="mt-3 space-y-2 overflow-y-auto" 
-            style={{ 
-              maxHeight: "320px",
-              scrollbarWidth: "thin",
-              scrollbarColor: "var(--color-border) transparent"
-            }}
-          >
-            {overdue.length === 0 && (
-              <li
-                className="text-sm"
-                style={{ color: "var(--color-foreground-muted)" }}
-              >
-                No overdue tasks.
-              </li>
-            )}
-            {overdue.map((task) => (
-              <li
-                key={task.id}
-                className="rounded-lg border p-2"
-                style={{
-                  borderColor:
-                    "color-mix(in srgb, var(--color-error) 25%, var(--color-border))",
-                  background:
-                    "color-mix(in srgb, var(--color-error) 7%, transparent)",
-                }}
-              >
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: "var(--color-foreground)" }}
-                >
-                  {task.title}
-                </p>
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--color-foreground-muted)" }}
-                >
-                  Due {formatDate(task.date)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article
-          className="rounded-xl border p-4"
-          style={{
-            background: "var(--color-surface)",
-            borderColor: "var(--color-border)",
-          }}
-        >
-          <h2
-            className="font-semibold flex items-center gap-2"
-            style={{ color: "var(--color-foreground)" }}
-          >
-            <CheckCircle2 size={16} /> Recently Completed
-          </h2>
-          <ul 
-            className="mt-3 space-y-2 overflow-y-auto" 
-            style={{ 
-              maxHeight: "320px",
-              scrollbarWidth: "thin",
-              scrollbarColor: "var(--color-border) transparent"
-            }}
-          >
-            {recentDone.length === 0 && (
-              <li
-                className="text-sm"
-                style={{ color: "var(--color-foreground-muted)" }}
-              >
-                No completed tasks yet.
-              </li>
-            )}
-            {recentDone.map((task) => (
-              <li
-                key={task.id}
-                className="rounded-lg border p-2"
-                style={{ borderColor: "var(--color-border)" }}
-              >
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: "var(--color-foreground)" }}
-                >
-                  {task.title}
-                </p>
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--color-foreground-muted)" }}
-                >
-                  {task.pageName}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </article>
-      </section>
-
-      <section
-        className="rounded-xl border p-4"
-        style={{
-          background: "var(--color-surface)",
-          borderColor: "var(--color-border)",
-        }}
-      >
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <h2
-            className="font-semibold"
-            style={{ color: "var(--color-foreground)" }}
-          >
-            Upcoming Tasks
-          </h2>
-          <Link
-            href="/tasks"
-            className="text-sm font-semibold"
-            style={{ color: "var(--color-primary)" }}
-          >
-            Open Task Pages
-          </Link>
-        </div>
-
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ color: "var(--color-foreground-muted)" }}>
-                <th className="text-left font-semibold py-2">Task</th>
-                <th className="text-left font-semibold py-2">Date</th>
-                <th className="text-left font-semibold py-2">Priority</th>
-                <th className="text-left font-semibold py-2">Page</th>
-              </tr>
-            </thead>
-            <tbody>
-              {upcoming.length === 0 && (
-                <tr>
-                  <td
-                    className="py-3"
-                    colSpan={4}
-                    style={{ color: "var(--color-foreground-muted)" }}
-                  >
-                    No upcoming tasks.
-                  </td>
-                </tr>
-              )}
-              {upcoming.slice(0, 8).map((task) => (
-                <tr
-                  key={task.id}
-                  className="border-t"
-                  style={{ borderColor: "var(--color-border)" }}
-                >
-                  <td
-                    className="py-2"
-                    style={{ color: "var(--color-foreground)" }}
-                  >
-                    {task.title}
-                  </td>
-                  <td
-                    className="py-2 text-sm md:text-md"
-                    style={{ color: "var(--color-foreground-muted)" }}
-                  >
-                    {formatDate(task.date)}
-                  </td>
-                  <td className="py-2">
-                    <span
-                      className="inline-flex rounded-full px-2 py-1 text-xs md:text-md font-semibold capitalize"
-                      style={{
-                        color:
-                          task.priority === "high"
-                            ? "var(--color-error)"
-                            : task.priority === "medium"
-                              ? "var(--color-warning)"
-                              : "var(--color-success)",
-                        background:
-                          task.priority === "high"
-                            ? "color-mix(in srgb, var(--color-error) 12%, transparent)"
-                            : task.priority === "medium"
-                              ? "color-mix(in srgb, var(--color-warning) 12%, transparent)"
-                              : "color-mix(in srgb, var(--color-success) 12%, transparent)",
-                      }}
-                    >
-                      {task.priority}
-                    </span>
-                  </td>
-                  <td className="py-2">
-                    <Link
-                      href={`/tasks/${task.pageId}`}
-                      className="font-medium text-sm md:text-md"
-                      style={{ color: "var(--color-primary)" }}
-                    >
-                      {task.pageName}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {/* Upcoming table */}
+    
     </div>
   );
 }

@@ -43,6 +43,9 @@ export type TaskCardProps = {
   editPriority: Task["priority"];
   isSelected?: boolean;
   details?: string;
+  deletingIds?: Set<number>;
+  togglingIds?: Set<number>;
+  savingEditId?: number | null;
   onToggle: (t: Task) => void;
   onDelete: (id: number) => void;
   onStartEdit: (t: Task) => void;
@@ -62,6 +65,9 @@ export function TaskCard({
   editPriority,
   isSelected,
   details,
+  deletingIds,
+  togglingIds,
+  savingEditId,
   onToggle,
   onDelete,
   onStartEdit,
@@ -77,6 +83,9 @@ export function TaskCard({
   const chip = PRIORITY_CHIP_COLORS[task.priority];
   const border = PRIORITY_BORDER[task.priority];
   const isEditing = editingId === task.id;
+  const isDeleting = deletingIds?.has(task.id);
+  const isToggling = togglingIds?.has(task.id);
+  const isSavingEdit = savingEditId === task.id;
   const hasDetails = details && details.trim() !== "" && details !== "<p>Add details...</p>" && details !== "<p></p>";
 
   return (
@@ -106,9 +115,12 @@ export function TaskCard({
       {/* Toggle */}
       <button
         onClick={() => onToggle(task)}
-        className="mt-1 text-muted-foreground hover:text-green-500 transition"
+        disabled={isToggling}
+        className="mt-1 text-muted-foreground hover:text-green-500 transition disabled:opacity-50"
       >
-        {task.completed ? (
+        {isToggling ? (
+          <span className="w-5 h-5 border-2 border-green-500/30 border-t-green-500 rounded-full animate-spin block" />
+        ) : task.completed ? (
           <CheckCircle2 size={20} className="text-green-500" />
         ) : (
           <Circle size={20} />
@@ -139,8 +151,13 @@ export function TaskCard({
                 onChange={(v) => setEditPriority(v as Task["priority"])}
               />
 
-              <Button onClick={() => onSaveEdit(task)}>
-                <Save size={14} /> Save
+              <Button onClick={() => onSaveEdit(task)} disabled={isSavingEdit}>
+                {isSavingEdit ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                {isSavingEdit ? "Saving…" : "Save"}
               </Button>
 
               <Button variant="ghost" onClick={onCancelEdit}>
@@ -197,9 +214,14 @@ export function TaskCard({
       {/* Delete */}
       <button
         onClick={() => onDelete(task.id)}
-        className="w-6 h-6 flex items-center justify-center rounded-full border border-red-300 text-red-500 hover:bg-red-500 hover:text-white transition"
+        disabled={isDeleting}
+        className="w-6 h-6 flex items-center justify-center rounded-full border border-red-300 text-red-500 hover:bg-red-500 hover:text-white transition disabled:opacity-40"
       >
-        <X size={16} />
+        {isDeleting ? (
+          <span className="w-3 h-3 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+        ) : (
+          <X size={16} />
+        )}
       </button>
     </div>
   );

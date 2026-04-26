@@ -132,7 +132,7 @@ export function Card({
         background: "var(--color-surface)",
         border: "1.5px solid var(--color-border)",
         borderRadius: 14,
-        padding: "18px 20px",
+        padding: "10px 20px",
         ...style,
       }}
     >
