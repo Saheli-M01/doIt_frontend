@@ -34,6 +34,12 @@ import {
   type ViewMode,
 } from "@/app/components/tasks/types";
 
+// Helper function to get today's date in local timezone (YYYY-MM-DD)
+function getTodayLocal(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 const PRIORITY_OPTIONS: DropdownOption[] = [
   { value: "low", label: "Low", color: "var(--color-success)" },
   { value: "medium", label: "Medium", color: "var(--color-warning)" },
@@ -217,8 +223,8 @@ export default function TasksPage() {
     if (addLockRef.current || isAdding) return; // prevent double submit
     addLockRef.current = true;
     setIsAdding(true);
-    const today = new Date().toISOString().split("T")[0];
-    const taskDate = date || today;
+    const today = getTodayLocal();
+    const taskDate = (date && date.trim()) ? date.trim() : today;
     try {
       const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
         method: "POST",
@@ -240,6 +246,7 @@ export default function TasksPage() {
       ]);
       setTitle("");
       setDate("");
+      setPriority("medium");
     } finally {
       setIsAdding(false);
       addLockRef.current = false;
@@ -271,7 +278,7 @@ export default function TasksPage() {
   const saveEditedTask = async (task: Task) => {
     if (!editText.trim() || savingEditId === task.id) return;
     setSavingEditId(task.id);
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayLocal();
     const taskDate = editDate || today;
     try {
       await updateTask({
@@ -685,7 +692,7 @@ export default function TasksPage() {
           mode="floating"
           onAddTasks={async ({ title, tasks: newTasks }) => {
             if (!taskPageId || !backendUserId || !/^\d+$/.test(taskPageId)) return;
-            const today = new Date().toISOString().split("T")[0];
+            const today = getTodayLocal();
             const formattedTasks = newTasks.map((t, i) => ({
               id: Date.now() + i + Math.floor(Math.random() * 1000),
               title: t.title,
