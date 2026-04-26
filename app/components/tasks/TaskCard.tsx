@@ -9,7 +9,7 @@ import {
   Plus,
   Save,
   X,
-  Check 
+  Check
 } from "lucide-react";
 
 import { PRIORITY_CONFIG, type Task } from "./types";
@@ -24,10 +24,16 @@ const PRIORITY_OPTIONS: DropdownOption[] = [
   { value: "high", label: "High" },
 ];
 
-const PRIORITY_STYLES = {
-  low: "border-l-[4px] border-l-green-500",
-  medium: "border-l-[4px] border-l-yellow-500",
-  high: "border-l-[4px] border-l-red-500",
+const PRIORITY_BORDER = {
+  low: "border-green-500/30",
+  medium: "border-yellow-500/30",
+  high: "border-red-500/30",
+};
+
+const PRIORITY_CHIP_COLORS = {
+  low: { text: "text-green-500", bg: "bg-green-500/10", border: "border-green-500/30" },
+  medium: { text: "text-yellow-500", bg: "bg-yellow-500/10", border: "border-yellow-500/30" },
+  high: { text: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/30" },
 };
 export type TaskCardProps = {
   task: Task;
@@ -36,6 +42,7 @@ export type TaskCardProps = {
   editDate: string;
   editPriority: Task["priority"];
   isSelected?: boolean;
+  details?: string;
   onToggle: (t: Task) => void;
   onDelete: (id: number) => void;
   onStartEdit: (t: Task) => void;
@@ -54,6 +61,7 @@ export function TaskCard({
   editDate,
   editPriority,
   isSelected,
+  details,
   onToggle,
   onDelete,
   onStartEdit,
@@ -66,15 +74,17 @@ export function TaskCard({
   setEditPriority,
 }: TaskCardProps) {
   const pc = PRIORITY_CONFIG[task.priority];
+  const chip = PRIORITY_CHIP_COLORS[task.priority];
+  const border = PRIORITY_BORDER[task.priority];
   const isEditing = editingId === task.id;
+  const hasDetails = details && details.trim() !== "" && details !== "<p>Add details...</p>" && details !== "<p></p>";
 
   return (
     <div
       className={`
-        flex gap-3 p-4 rounded-xl border transition-all
-        ${PRIORITY_STYLES[task.priority]}
-        ${isSelected ? "border-primary bg-primary/10" : "border-border bg-surface"}
-        ${task.completed ? "opacity-60" : ""}
+        flex gap-3 px-3 py-2.5 rounded-xl border-2 transition-all 
+        ${isSelected ? "border-primary bg-primary/10" : border + " bg-surface"}
+        ${task.completed && !isEditing ? "opacity-60" : ""}
       `}
     >
       {/* Select */}
@@ -83,14 +93,13 @@ export function TaskCard({
           onClick={onSelect}
           className={`
             w-4 h-4 mt-1 rounded flex items-center justify-center border-2 transition
-            ${
-              isSelected
-                ? "bg-primary border-primary text-white"
-                : "border-border"
+            ${isSelected
+              ? "bg-primary border-primary text-white"
+              : "border-border"
             }
           `}
         >
-          {isSelected && <span className="text-[10px]"><Check size={12}/></span>}
+          {isSelected && <span className="text-[10px]"><Check size={12} /></span>}
         </button>
       )}
 
@@ -152,7 +161,7 @@ export function TaskCard({
 
             <div className="flex flex-wrap items-center gap-2">
               {/* Priority */}
-              <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border bg-muted text-foreground">
+              <span className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border ${chip.bg} ${chip.text} ${chip.border}`}>
                 <Flag size={11} /> {pc?.label}
               </span>
 
@@ -173,9 +182,12 @@ export function TaskCard({
               {/* Details */}
               <button
                 onClick={() => onOpenDetails(task.id)}
-                className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border text-primary-light bg-primary-light/10 border-primary-light/30"
+                className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${hasDetails
+                    ? "text-green-500 bg-green-500/10 border-green-500/30"
+                    : "text-primary-light bg-primary-light/10 border-primary-light/30"
+                  }`}
               >
-                <Plus size={11} /> Details
+                {hasDetails ? <Check size={11} /> : <Plus size={11} />} Details
               </button>
             </div>
           </>

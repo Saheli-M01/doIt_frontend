@@ -9,7 +9,8 @@ function formatDate(d: Date) {
 }
 
 export function formatDisplayDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -57,7 +58,8 @@ export function groupTasks(
     .sort(([, aList], [, bList]) => {
       const firstA = aList[0].date;
       const firstB = bList[0].date;
-      return firstA < firstB ? -1 : 1;
+      // newest group first
+      return firstB.localeCompare(firstA);
     })
     .map(([key, tasks]) => ({ key, tasks }));
 }

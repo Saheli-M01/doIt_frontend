@@ -175,9 +175,8 @@ export default function TasksPage() {
         )
         .sort((a, b) => {
           if (dateSort === "none") return 0;
-          const tA = new Date(a.date).getTime();
-          const tB = new Date(b.date).getTime();
-          return dateSort === "asc" ? tA - tB : tB - tA;
+          if (dateSort === "asc") return a.date.localeCompare(b.date);
+          return b.date.localeCompare(a.date);
         }),
     [tasks, search, priorityFilter, dateSort],
   );
@@ -202,14 +201,16 @@ export default function TasksPage() {
   };
 
   const addTask = async () => {
-    if (!taskPageId || !title.trim() || !date || !backendUserId || !/^\d+$/.test(taskPageId)) return;
+    if (!taskPageId || !title.trim() || !backendUserId || !/^\d+$/.test(taskPageId)) return;
+    const today = new Date().toISOString().split("T")[0];
+    const taskDate = date || today;
     const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: title.trim(),
         completed: false,
-        date,
+        date: taskDate,
         priority,
         details: "",
         taskPageId: Number(taskPageId),
@@ -248,11 +249,12 @@ export default function TasksPage() {
   };
 
   const saveEditedTask = async (task: Task) => {
-    if (!editText.trim() || !editDate) return;
+    if (!editText.trim()) return;
+    const today = new Date().toISOString().split("T")[0];
     await updateTask({
       ...task,
       title: editText.trim(),
-      date: editDate,
+      date: editDate || today,
       priority: editPriority,
     });
     setEditingId(null);
@@ -581,7 +583,7 @@ export default function TasksPage() {
             <DatePicker
               value={date}
               onChange={setDate}
-              placeholder="dd-mm-yyyy"
+              placeholder="Due date"
             />
             <Dropdown
               value={priority}
@@ -589,7 +591,7 @@ export default function TasksPage() {
               onChange={(next) => setPriority(next as Task["priority"])}
               style={{ minWidth: 138 }}
             />
-            <Button onClick={addTask} disabled={!title.trim() || !date}>
+            <Button onClick={addTask} disabled={!title.trim()}>
               <Plus size={17} /> Add Task
             </Button>
           </div>
@@ -712,6 +714,7 @@ export default function TasksPage() {
                 key={task.id}
                 task={task}
                 {...taskCardProps}
+                details={detailsById[task.id]}
                 isSelected={selectedTasks.includes(task.id)}
                 onSelect={() => toggleSelectTask(task.id)}
               />
@@ -752,6 +755,7 @@ export default function TasksPage() {
                 selectedTasks={selectedTasks}
                 taskCardProps={taskCardProps}
                 onSelectTask={toggleSelectTask}
+                detailsById={detailsById}
               />
             ))}
           </div>

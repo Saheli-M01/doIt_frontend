@@ -12,6 +12,7 @@ interface GroupCardProps {
   selectedTasks: number[];
   taskCardProps: Omit<TaskCardProps, "task" | "isSelected" | "onSelect">;
   onSelectTask: (id: number) => void;
+  detailsById?: Record<number, string>;
 }
 
 export function GroupCard({
@@ -22,6 +23,7 @@ export function GroupCard({
   selectedTasks,
   taskCardProps,
   onSelectTask,
+  detailsById = {},
 }: GroupCardProps) {
   const done = tasks.filter((t) => t.completed).length;
   const progress =
@@ -170,6 +172,7 @@ export function GroupCard({
               key={task.id}
               task={task}
               {...taskCardProps}
+              details={detailsById[task.id]}
               isSelected={selectedTasks.includes(task.id)}
               onSelect={() => onSelectTask(task.id)}
             />
