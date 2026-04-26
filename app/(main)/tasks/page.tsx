@@ -272,11 +272,12 @@ export default function TasksPage() {
     if (!editText.trim() || savingEditId === task.id) return;
     setSavingEditId(task.id);
     const today = new Date().toISOString().split("T")[0];
+    const taskDate = editDate || today;
     try {
       await updateTask({
         ...task,
         title: editText.trim(),
-        date: editDate || today,
+        date: taskDate,
         priority: editPriority,
       });
       setEditingId(null);
@@ -372,22 +373,49 @@ export default function TasksPage() {
     }
   };
 
-  const repeatTasks = (days: number) => {
+  const repeatTasks = async (days: number) => {
+    if (!taskPageId || !backendUserId || !/^\d+$/.test(taskPageId)) return;
     const newTasks: Task[] = [];
-    selectedTasks.forEach((id) => {
+    
+    for (const id of selectedTasks) {
       const orig = tasks.find((t) => t.id === id);
-      if (!orig) return;
+      if (!orig) continue;
+      
       for (let i = 1; i <= days; i++) {
-        newTasks.push({
-          ...orig,
-          id: Date.now() + i + Math.random(),
-          completed: false,
-          date: new Date(new Date(orig.date).getTime() + i * 86400000)
-            .toISOString()
-            .split("T")[0],
-        });
+        const newDate = new Date(new Date(orig.date).getTime() + i * 86400000)
+          .toISOString()
+          .split("T")[0];
+        
+        try {
+          const res = await fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: orig.title,
+              completed: false,
+              date: newDate,
+              priority: orig.priority,
+              details: detailsById[orig.id] ?? "",
+              taskPageId: Number(taskPageId),
+            }),
+          });
+          
+          if (res.ok) {
+            const created = await res.json();
+            newTasks.push({
+              id: created.id,
+              title: created.title,
+              completed: created.completed,
+              date: created.date,
+              priority: created.priority,
+            });
+          }
+        } catch (error) {
+          console.error("Error creating repeated task:", error);
+        }
       }
-    });
+    }
+    
     persistTasks([...newTasks, ...tasks]);
     setSelectedTasks([]);
   };
