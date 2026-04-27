@@ -6,54 +6,55 @@
 :root {
   /* Backgrounds */
   --color-background: #ffffff;
-  --color-surface:    #f8f9fa;
-  --color-muted:      #e9ecef;
+  --color-surface: #f8f9fa;
+  --color-muted: #e9ecef;
 
   /* Foregrounds */
-  --color-foreground:       #0b0b0f;
+  --color-foreground: #0b0b0f;
   --color-foreground-muted: #6c757d;
 
   /* Brand blue — extracted from DoIt logo */
-  --color-primary:       #4a90e2;
+  --color-primary: #4a90e2;
   --color-primary-light: #6ba3e8;
-  --color-primary-dark:  #3a7bc8;
+  --color-primary-dark: #3a7bc8;
 
   /* Semantic */
   --color-secondary: #adb5bd;
-  --color-accent:    #4a90e2;
-  --color-border:    #dee2e6;
-  --color-error:     #dc3545;
-  --color-success:   #28a745;
-  --color-warning:   #ffc107;
+  --color-accent: #4a90e2;
+  --color-border: #dee2e6;
+  --color-error: #dc3545;
+  --color-success: #28a745;
+  --color-warning: #ffc107;
 }
 
 /* ── Dark theme ──────────────────────────────────────────────────────────── */
 .dark {
   /* Backgrounds */
   --color-background: #0a0a0a;
-  --color-surface:    #1a1a1a;
-  --color-muted:      #2a2a2a;
+  --color-surface: #1a1a1a;
+  --color-muted: #2a2a2a;
 
   /* Foregrounds */
-  --color-foreground:       #ededed;
+  --color-foreground: #ededed;
   --color-foreground-muted: #a0a0a0;
 
   /* Brand blue — slightly lighter for dark backgrounds */
-  --color-primary:       #5a9fed;
+  --color-primary: #5a9fed;
   --color-primary-light: #7bb3f0;
-  --color-primary-dark:  #4a90e2;
+  --color-primary-dark: #4a90e2;
 
   /* Semantic */
   --color-secondary: #6c757d;
-  --color-accent:    #5a9fed;
-  --color-border:    #3a3a3a;
-  --color-error:     #e74c3c;
-  --color-success:   #2ecc71;
-  --color-warning:   #f39c12;
+  --color-accent: #5a9fed;
+  --color-border: #3a3a3a;
+  --color-error: #e74c3c;
+  --color-success: #2ecc71;
+  --color-warning: #f39c12;
 }
 
 /* ── Base styles ─────────────────────────────────────────────────────────── */
-html, body {
+html,
+body {
   overflow-x: hidden;
   max-width: 100%;
 }
@@ -63,7 +64,9 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
   /* Smooth theme transitions */
-  transition: background-color 200ms ease-in-out, color 200ms ease-in-out;
+  transition:
+    background-color 200ms ease-in-out,
+    color 200ms ease-in-out;
 }
 
 /* Disable transitions on initial load to prevent flash of unstyled content */
@@ -96,4 +99,13 @@ body {
 
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-foreground-muted);
+}
+
+/* TipTap placeholder for task details editor */
+.task-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-foreground-muted);
+  float: left;
+  pointer-events: none;
+  height: 0;
 }
