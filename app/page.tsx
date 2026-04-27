@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import { useTheme } from "@/app/context/ThemeContext";
 import { ContactModal } from "@/app/components/ContactModal";
@@ -13,18 +12,11 @@ import { Features } from "@/app/components/home/Features";
 
 /* ─────────────────────── main page ─────────────────────── */
 export default function Home() {
-  const { user, isLoading } = useUser();
+  const { isLoading } = useUser();
   const { mounted } = useTheme();
-  const router = useRouter();
   const [contactOpen, setContactOpen] = useState(false);
 
-  useEffect(() => {
-    if (!isLoading && user) {
-      router.push("/dashboard");
-    }
-  }, [user, isLoading, router]);
-
-  if (isLoading || !mounted || user) return null;
+  if (isLoading || !mounted) return null;
 
   return (
     <>

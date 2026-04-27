@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { X, Mail } from "lucide-react";
+import { X, Mail, LogOut } from "lucide-react";
 import { ThemedLogo } from "./ThemedLogo";
 import { ThemeToggle } from "./ThemeToggle";
+import { useUser } from "@/app/context/UserContext";
 
 type Props = {
   isOpen: boolean;
@@ -19,6 +20,16 @@ export function MobileSidebar({
   onContactClick,
   showAuthButtons = true,
 }: Props) {
+  const { user, setUser } = useUser();
+  const authHref = user ? "/dashboard" : "/auth/login";
+  const authLabel = user ? "Your Dashboard" : "Sign in";
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    setUser(null);
+    onClose();
+  };
+
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "auto";
     return () => {
@@ -44,7 +55,9 @@ export function MobileSidebar({
       >
         {/* header: logo + close */}
         <div className="flex items-center justify-between px-4 h-14 border-b border-border">
-          <ThemedLogo />
+          <Link href="/" onClick={onClose}>
+            <ThemedLogo />
+          </Link>
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted"
@@ -64,12 +77,22 @@ export function MobileSidebar({
 
           {showAuthButtons && (
             <Link
-              href="/auth/login"
+              href={authHref}
               onClick={onClose}
               className="px-3 py-2.5 rounded-lg hover:bg-muted transition font-medium"
             >
-              Sign in
+              {authLabel}
             </Link>
+          )}
+
+          {showAuthButtons && user && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-muted transition text-left text-error"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
           )}
 
           {onContactClick && (

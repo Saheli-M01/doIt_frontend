@@ -65,7 +65,10 @@ export default function AIChat({
           email?: string;
         };
 
-        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(
+          /\/$/,
+          "",
+        );
         const registerRes = await fetch(`${baseUrl}/api/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -123,17 +126,24 @@ export default function AIChat({
       aiUserId = userId;
     }
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate/${aiUserId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
-    });
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate/${aiUserId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      },
+    );
 
     const text = await res.text();
     if (!res.ok) {
       try {
         const err = JSON.parse(text) as { error?: string; details?: string };
-        alert(err.details ? `${err.error ?? "Request failed"}\n\n${err.details}` : (err.error ?? "Request failed"));
+        alert(
+          err.details
+            ? `${err.error ?? "Request failed"}\n\n${err.details}`
+            : (err.error ?? "Request failed"),
+        );
       } catch {
         alert(text);
       }
@@ -229,20 +239,46 @@ export default function AIChat({
     ) : (
       <button
         onClick={handleOpenPlanner}
-        className="group cursor-pointer w-full px-3 py-2 text-sm flex items-center gap-2 font-mono tracking-tight transition-all duration-150"
+        className="group cursor-pointer w-full px-3.5 py-2.5 text-sm flex items-center justify-between gap-2 font-mono tracking-tight transition-all duration-150"
         style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 0,
+          background:
+            "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, var(--color-surface)), var(--color-surface))",
+          border:
+            "1px solid color-mix(in srgb, var(--color-primary) 45%, var(--color-border))",
+          borderRadius: 10,
           color: "var(--color-foreground)",
+          boxShadow:
+            "0 6px 18px color-mix(in srgb, var(--color-primary) 22%, transparent)",
         }}
       >
-        <Cpu
-          size={14}
-          className="transition-transform duration-200 group-hover:rotate-90"
-          style={{ color: "var(--color-primary)" }}
-        />
-        <span className="text-[13px]">AI Planner</span>
+        <span className="flex items-center gap-2.5">
+          <span
+            className="w-6 h-6 rounded-md flex items-center justify-center"
+            style={{
+              background:
+                "color-mix(in srgb, var(--color-primary) 18%, transparent)",
+            }}
+          >
+            <Cpu
+              size={14}
+              className="transition-transform duration-200 group-hover:rotate-90"
+              style={{ color: "var(--color-primary)" }}
+            />
+          </span>
+          <span className="text-[13px] font-semibold">AI Planner</span>
+        </span>
+        <span
+          className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full"
+          style={{
+            color: "var(--color-primary)",
+            background:
+              "color-mix(in srgb, var(--color-primary) 18%, transparent)",
+            border:
+              "1px solid color-mix(in srgb, var(--color-primary) 45%, transparent)",
+          }}
+        >
+          Smart
+        </span>
       </button>
     );
 
