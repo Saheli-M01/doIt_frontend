@@ -62,17 +62,9 @@ export function DetailsSlider({
                 fontSize: 18, fontWeight: 800,
                 color: "var(--color-foreground)", margin: 0,
               }}>
-                Task Details
+                {task?.title || "Task Details"}
               </h2>
             </div>
-            {task && (
-              <p style={{
-                fontSize: 13, color: "var(--color-foreground-muted)",
-                margin: 0, maxWidth: 340,
-              }}>
-                {task.title}
-              </p>
-            )}
           </div>
           <button
             onClick={onClose}

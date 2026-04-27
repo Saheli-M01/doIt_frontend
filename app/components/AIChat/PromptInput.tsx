@@ -6,6 +6,7 @@ type PromptInputProps = {
   usageCount: number;
   usageWarning: string;
   usageLimitReached: boolean;
+  usageLoading?: boolean;
 };
 
 export default function PromptInput({
@@ -14,6 +15,7 @@ export default function PromptInput({
   usageCount,
   usageWarning,
   usageLimitReached,
+  usageLoading = false,
 }: PromptInputProps) {
   const promptExamples = [
     "Prepare for DBMS interview in 3 days. I have 2 hours daily. Prioritize SQL and normalization.",
@@ -24,7 +26,14 @@ export default function PromptInput({
   return (
     <div>
       <p className="text-xs text-muted-foreground mb-2">
-        Usage: {usageCount}/5
+        {usageLoading ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            Loading usage...
+          </span>
+        ) : (
+          `Usage: ${usageCount}/5`
+        )}
       </p>
 
       {usageWarning && (

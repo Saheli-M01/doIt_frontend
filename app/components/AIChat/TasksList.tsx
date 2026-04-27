@@ -4,6 +4,7 @@ type TaskItem = {
   title: string;
   priority: "low" | "medium" | "high";
   date: string;
+  details?: string;
 };
 
 type TaskListProps = {
@@ -175,12 +176,22 @@ export default function TaskList({ tasks, loading }: TaskListProps) {
                   </span>
 
                   {/* Title */}
-                  <span
-                    className="flex-1 font-mono text-[13px] leading-snug transition-colors duration-100"
-                    style={{ color: "var(--color-foreground)" }}
-                  >
-                    {t.title}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="font-mono text-[13px] leading-snug transition-colors duration-100"
+                      style={{ color: "var(--color-foreground)" }}
+                    >
+                      {t.title}
+                    </p>
+                    {t.details && (
+                      <p
+                        className="font-mono text-[11px] mt-0.5 line-clamp-2"
+                        style={{ color: "var(--color-foreground-muted)" }}
+                      >
+                        {t.details}
+                      </p>
+                    )}
+                  </div>
 
                   {/* Right side: date + priority */}
                   <div className="flex items-center gap-2 shrink-0 mt-0.5">

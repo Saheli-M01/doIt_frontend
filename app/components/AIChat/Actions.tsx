@@ -8,6 +8,7 @@ type ActionsProps = {
   hasTasks: boolean;
   converted: boolean;
   usageLimitReached: boolean;
+  converting?: boolean;
 };
 
 export default function Actions({
@@ -18,6 +19,7 @@ export default function Actions({
   hasTasks,
   converted,
   usageLimitReached,
+  converting = false,
 }: ActionsProps) {
   return (
     <div className="flex gap-4 items-center">
@@ -40,14 +42,23 @@ export default function Actions({
         <Button
           data-tour="ai-convert-tasks"
           onClick={onConvert}
-          disabled={loading || converted}
+          disabled={loading || converted || converting}
           style={{
             background: "var(--color-foreground)",
             color: "var(--color-background)",
-            cursor: loading || converted ? "not-allowed" : "pointer",
+            cursor: loading || converted || converting ? "not-allowed" : "pointer",
           }}
         >
-          {converted ? "Added..." : "Convert to Tasks"}
+          {converting ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Converting...
+            </span>
+          ) : converted ? (
+            "Added..."
+          ) : (
+            "Convert to Tasks"
+          )}
         </Button>
       )}
     </div>

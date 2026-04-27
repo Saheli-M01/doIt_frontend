@@ -21,6 +21,7 @@ type GeneratedTask = {
   title: string;
   priority: "low" | "medium" | "high";
   date: string;
+  details: string;
 };
 
 type PlanResponse = {
@@ -49,6 +50,8 @@ export default function AIChat({
   const [converted, setConverted] = useState(false);
   const [usageWarning, setUsageWarning] = useState("");
   const [planTitle, setPlanTitle] = useState("");
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const isUsageLimitReached = usageCount >= MAX_USAGE;
 
@@ -56,6 +59,7 @@ export default function AIChat({
     if (!open) return;
 
     const syncUsageCount = async () => {
+      setUsageLoading(true);
       try {
         const stored = localStorage.getItem("user");
         if (!stored) return;
@@ -85,6 +89,8 @@ export default function AIChat({
         setUsageCount(Number.isFinite(count) ? Math.min(MAX_USAGE, count) : 0);
       } catch {
         // Keep UI functional even if usage sync fails.
+      } finally {
+        setUsageLoading(false);
       }
     };
 
@@ -180,6 +186,7 @@ export default function AIChat({
             title: String(task.title ?? "").trim(),
             priority,
             date: task.date ?? "",
+            details: String(task.details ?? "").trim(),
           };
         })
         .filter((task) => task.title.length > 0);
@@ -202,22 +209,27 @@ export default function AIChat({
     }
   };
 
-  const convertToTasks = () => {
-    if (onAddTasks) {
-      onAddTasks({
-        title: planTitle,
-        tasks: aiTasks,
-      });
-    } else {
-      onCreateTaskPage?.({
-        title: planTitle,
-        tasks: aiTasks,
-      });
+  const convertToTasks = async () => {
+    setConverting(true);
+    try {
+      if (onAddTasks) {
+        await onAddTasks({
+          title: planTitle,
+          tasks: aiTasks,
+        });
+      } else {
+        await onCreateTaskPage?.({
+          title: planTitle,
+          tasks: aiTasks,
+        });
+      }
+      setAiTasks([]);
+      setPrompt("");
+      setOpen(false);
+      setConverted(true);
+    } finally {
+      setConverting(false);
     }
-    setAiTasks([]);
-    setPrompt("");
-    setOpen(false);
-    setConverted(true);
   };
 
   const trigger =
@@ -351,6 +363,7 @@ export default function AIChat({
             usageCount={usageCount}
             usageWarning={usageWarning}
             usageLimitReached={isUsageLimitReached}
+            usageLoading={usageLoading}
           />
           <Actions
             loading={loading}
@@ -360,6 +373,7 @@ export default function AIChat({
             hasTasks={aiTasks.length > 0}
             converted={converted}
             usageLimitReached={isUsageLimitReached}
+            converting={converting}
           />
           <TaskList tasks={aiTasks} loading={loading} />
         </div>

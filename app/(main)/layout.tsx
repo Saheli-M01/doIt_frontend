@@ -4,11 +4,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@/app/context/UserContext";
 import AIChat from "@/app/components/AIChat/AIChat";
-import { ProductTour } from "@/app/components/tour/ProductTour";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { ContactModal } from "@/app/components/ContactModal";
 import { resolveBackendUserId } from "@/lib/backendUser";
+import { DeleteConfirmDialog } from "@/app/components/DeleteConfirmDialog";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -21,12 +21,19 @@ import {
   Mail,
   Compass,
 } from "lucide-react";
-import type { Task } from "@/app/components/tasks/types";
 import {
   taskNavPagesKey,
   taskItemsKey,
   taskDetailsKey,
 } from "@/app/components/tasks/types";
+
+type PlannedTask = {
+  title: string;
+  completed?: boolean;
+  date?: string | null;
+  priority: "low" | "medium" | "high";
+  details?: string;
+};
 
 type TaskNavPage = {
   id: string;
@@ -44,6 +51,11 @@ export default function MainLayout({
   const [taskPages, setTaskPages] = useState<TaskNavPage[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  const [deletePageDialog, setDeletePageDialog] = useState<{
+    open: boolean;
+    pageId: string | null;
+    pageName: string;
+  }>({ open: false, pageId: null, pageName: "" });
 
   // Load task pages from backend for this user
   useEffect(() => {
@@ -105,7 +117,7 @@ export default function MainLayout({
   };
 
   const createTaskPage = async (
-    generatedTasks: Task[] = [],
+    generatedTasks: PlannedTask[] = [],
     pageName?: string,
   ) => {
     if (!user) return;
@@ -158,7 +170,7 @@ export default function MainLayout({
               completed: Boolean(task.completed),
               date: task.date || today,
               priority: task.priority,
-              details: "",
+              details: task.details || "",
               taskPageId: Number(id),
             }),
           }),
@@ -171,6 +183,19 @@ export default function MainLayout({
 
   const deleteTaskPage = async (pageId: string) => {
     if (!user) return;
+    
+    const page = taskPages.find((p) => p.id === pageId);
+    setDeletePageDialog({
+      open: true,
+      pageId,
+      pageName: page?.name || "this task page",
+    });
+  };
+
+  const confirmDeleteTaskPage = async () => {
+    const pageId = deletePageDialog.pageId;
+    if (!pageId || !user) return;
+    
     const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
     if (/^\d+$/.test(pageId)) {
@@ -193,6 +218,7 @@ export default function MainLayout({
     if (pathname === `/tasks/${pageId}`) {
       router.push("/tasks");
     }
+    setDeletePageDialog({ open: false, pageId: null, pageName: "" });
   };
 
   const isTasksActive = pathname.startsWith("/tasks");
@@ -327,6 +353,7 @@ export default function MainLayout({
                 completed: false,
                 date: t.date,
                 priority: t.priority,
+                details: t.details || "",
               }));
 
               createTaskPage(formattedTasks, title);
@@ -374,7 +401,17 @@ export default function MainLayout({
         <div className="p-4 md:p-6 mt-14 md:mt-0 max-w-full">{children}</div>
       </main>
 
-      <ProductTour />
+
+      {/* Delete Task Page Confirmation */}
+      <DeleteConfirmDialog
+        open={deletePageDialog.open}
+        onOpenChange={(open) =>
+          setDeletePageDialog({ open, pageId: null, pageName: "" })
+        }
+        onConfirm={confirmDeleteTaskPage}
+        title="Delete Task Page"
+        description={`Are you sure you want to delete "${deletePageDialog.pageName}"? All tasks in this page will be permanently deleted. This action cannot be undone.`}
+      />
     </div>
   );
 }

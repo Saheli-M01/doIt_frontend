@@ -24,6 +24,7 @@ import { DatePicker } from "@/app/components/tasks/DatePicker";
 import { Dropdown, type DropdownOption } from "@/app/components/tasks/Dropdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import { groupTasks } from "@/app/components/tasks/grouping";
+import { DeleteConfirmDialog } from "@/app/components/DeleteConfirmDialog";
 import { useUser } from "@/app/context/UserContext";
 import { resolveBackendUserId } from "@/lib/backendUser";
 import {
@@ -100,6 +101,12 @@ export default function TasksPage() {
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
   const [savingEditId, setSavingEditId] = useState<number | null>(null);
   const addLockRef = useRef(false); // prevents double-submit
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    taskId: number | null;
+    taskTitle: string;
+  }>({ open: false, taskId: null, taskTitle: "" });
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
 
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -324,6 +331,19 @@ export default function TasksPage() {
 
   const deleteTask = async (id: number) => {
     if (deletingIds.has(id)) return;
+    
+    const task = tasks.find((t) => t.id === id);
+    setDeleteDialog({
+      open: true,
+      taskId: id,
+      taskTitle: task?.title || "this task",
+    });
+  };
+
+  const confirmDeleteTask = async () => {
+    const id = deleteDialog.taskId;
+    if (!id) return;
+    
     setDeletingIds((prev) => new Set(prev).add(id));
     try {
       const res = await fetch(`${baseUrl}/api/tasks/${id}`, {
@@ -345,6 +365,7 @@ export default function TasksPage() {
         s.delete(id);
         return s;
       });
+      setDeleteDialog({ open: false, taskId: null, taskTitle: "" });
     }
   };
 
@@ -683,19 +704,7 @@ export default function TasksPage() {
         <BulkBar
           count={selectedTasks.length}
           onRepeat={repeatTasks}
-          onDelete={async () => {
-            try {
-              await Promise.all(
-                selectedTasks.map((id) =>
-                  fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" }),
-                ),
-              );
-              persistTasks(tasks.filter((t) => !selectedTasks.includes(t.id)));
-              setSelectedTasks([]);
-            } catch (error) {
-              console.error("Error deleting tasks:", error);
-            }
-          }}
+          onDelete={() => setBulkDeleteDialog(true)}
         />
 
         {/* ── All view ── */}
@@ -789,6 +798,39 @@ export default function TasksPage() {
           onClose={() => setOpenDetailsTaskId(null)}
           onDraftChange={setDetailsDraft}
           onSave={saveDetails}
+        />
+
+        {/* Delete Confirmation Dialogs */}
+        <DeleteConfirmDialog
+          open={deleteDialog.open}
+          onOpenChange={(open) =>
+            setDeleteDialog({ open, taskId: null, taskTitle: "" })
+          }
+          onConfirm={confirmDeleteTask}
+          title="Delete Task"
+          description={`Are you sure you want to delete "${deleteDialog.taskTitle}"? This action cannot be undone.`}
+          isDeleting={deleteDialog.taskId ? deletingIds.has(deleteDialog.taskId) : false}
+        />
+
+        <DeleteConfirmDialog
+          open={bulkDeleteDialog}
+          onOpenChange={setBulkDeleteDialog}
+          onConfirm={async () => {
+            try {
+              await Promise.all(
+                selectedTasks.map((id) =>
+                  fetch(`${baseUrl}/api/tasks/${id}`, { method: "DELETE" }),
+                ),
+              );
+              persistTasks(tasks.filter((t) => !selectedTasks.includes(t.id)));
+              setSelectedTasks([]);
+            } catch (error) {
+              console.error("Error deleting tasks:", error);
+            }
+          }}
+          title="Delete Multiple Tasks"
+          description={`Are you sure you want to delete ${selectedTasks.length} task${selectedTasks.length !== 1 ? 's' : ''}? All selected tasks will be permanently deleted. This action cannot be undone.`}
+          confirmText={`Delete ${selectedTasks.length} Task${selectedTasks.length !== 1 ? 's' : ''}`}
         />
       </div>
     </>
