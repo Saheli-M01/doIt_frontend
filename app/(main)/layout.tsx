@@ -9,6 +9,7 @@ import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { ContactModal } from "@/app/components/ContactModal";
 import { resolveBackendUserId } from "@/lib/backendUser";
 import { DeleteConfirmDialog } from "@/app/components/DeleteConfirmDialog";
+
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -361,23 +362,7 @@ export default function MainLayout({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (pathname.startsWith("/tasks")) {
-              window.dispatchEvent(new Event("doit:start-tour"));
-              return;
-            }
-
-            sessionStorage.setItem("doit-product-tour-pending", "1");
-            const firstPageId = taskPages[0]?.id;
-            router.push(firstPageId ? `/tasks/${firstPageId}` : "/tasks");
-          }}
-          className="px-4 py-2 rounded text-primary hover:bg-muted transition-colors text-left flex items-center gap-2 text-sm border border-primary/25 bg-primary/10"
-        >
-          <Compass size={16} />
-          Start Product Tour
-        </button>
+       
 
         <button
           onClick={() => setContactOpen(true)}
@@ -400,6 +385,7 @@ export default function MainLayout({
       <main className="flex-1 w-full h-screen overflow-y-auto bg-background text-foreground relative">
         <div className="p-4 md:p-6 mt-14 md:mt-0 max-w-full">{children}</div>
       </main>
+
 
 
       {/* Delete Task Page Confirmation */}

@@ -8,6 +8,7 @@ export interface DropdownOption {
   value: string;
   label: string;
   color?: string;
+  icon?: React.ReactNode;
 }
 
 interface DropdownProps {
@@ -88,6 +89,7 @@ export function Dropdown({ value, options, onChange, style, placeholder }: Dropd
         }`}
       >
         <span className="flex items-center gap-1.5">
+          {selected?.icon && <span className="shrink-0">{selected.icon}</span>}
           {selected?.color && (
             <span
               className="w-2 h-2 rounded-full shrink-0"
@@ -123,6 +125,7 @@ export function Dropdown({ value, options, onChange, style, placeholder }: Dropd
                 }`}
               >
                 <span className="flex items-center gap-2">
+                  {opt.icon && <span className="shrink-0">{opt.icon}</span>}
                   {opt.color && (
                     <span
                       className="w-2 h-2 rounded-full shrink-0"

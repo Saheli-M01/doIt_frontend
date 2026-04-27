@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
-import "shepherd.js/dist/css/shepherd.css";
 import { Providers } from "./providers";
 import Script from "next/script";
 
