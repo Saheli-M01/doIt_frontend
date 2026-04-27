@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { Sparkles, ArrowRight, BrainCircuit, Zap, Target } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 
 export function Hero() {
@@ -12,19 +12,35 @@ export function Hero() {
       {/* pill badge */}
       <div className="inline-flex items-center gap-1.5 mb-4 sm:mb-6 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 tracking-wide uppercase max-w-full">
         <Sparkles className="w-3 h-3 shrink-0" />
-        <span className="truncate">Task management, simplified</span>
+        <span className="truncate">AI-first task command center</span>
       </div>
 
       <h1 className="text-4xl sm:text-5xl lg:text-[4.5rem] font-bold tracking-tight mb-4 sm:mb-5 leading-[1.1] sm:leading-[1.08] w-full">
-        Do more.
+        Plan with AI.
         <br />
-        <span className="text-primary">Stress less.</span>
+        <span className="text-primary">Execute with focus.</span>
       </h1>
 
       <p className="text-sm sm:text-base lg:text-lg text-foreground-muted mb-8 sm:mb-10 leading-relaxed max-w-lg w-full">
-        GetDoIt keeps your tasks, projects, and ideas in one clean space — with
-        an AI assistant that actually helps you get things done.
+        Turn one messy idea into a clear action plan in seconds. GetDoIt uses AI
+        to break goals into practical tasks, priorities, and deadlines you can
+        actually follow.
       </p>
+
+      <div className="flex flex-wrap justify-center gap-2 mb-8">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-border bg-surface text-xs text-foreground-muted">
+          <BrainCircuit className="w-3.5 h-3.5 text-primary" />
+          Smart task breakdown
+        </span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-border bg-surface text-xs text-foreground-muted">
+          <Target className="w-3.5 h-3.5 text-primary" />
+          Priority-aware planning
+        </span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-border bg-surface text-xs text-foreground-muted">
+          <Zap className="w-3.5 h-3.5 text-primary" />
+          Faster daily execution
+        </span>
+      </div>
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
         {user ? (

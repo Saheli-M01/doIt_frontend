@@ -111,92 +111,95 @@ export default function AIChat({
     if (!prompt.trim()) return;
     setLoading(true);
 
-    let aiUserId = userId;
     try {
-      const stored = localStorage.getItem("user");
-      if (stored) {
-        const parsed = JSON.parse(stored) as {
-          id: string | number;
-          name?: string;
-          email?: string;
-        };
-        aiUserId = String(await resolveBackendUserId(parsed));
-      }
-    } catch {
-      aiUserId = userId;
-    }
-
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate/${aiUserId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      },
-    );
-
-    const text = await res.text();
-    if (!res.ok) {
+      let aiUserId = userId;
       try {
-        const err = JSON.parse(text) as { error?: string; details?: string };
-        alert(
-          err.details
-            ? `${err.error ?? "Request failed"}\n\n${err.details}`
-            : (err.error ?? "Request failed"),
-        );
+        const stored = localStorage.getItem("user");
+        if (stored) {
+          const parsed = JSON.parse(stored) as {
+            id: string | number;
+            name?: string;
+            email?: string;
+          };
+          aiUserId = String(await resolveBackendUserId(parsed));
+        }
+      } catch {
+        aiUserId = userId;
+      }
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate/${aiUserId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        },
+      );
+
+      const text = await res.text();
+      if (!res.ok) {
+        try {
+          const err = JSON.parse(text) as { error?: string; details?: string };
+          alert(
+            err.details
+              ? `${err.error ?? "Request failed"}\n\n${err.details}`
+              : (err.error ?? "Request failed"),
+          );
+        } catch {
+          alert(text);
+        }
+        return;
+      }
+
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
       } catch {
         alert(text);
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    let data: unknown;
-    try {
-      data = JSON.parse(text);
+      const parsed = data as PlanResponse | Array<Partial<GeneratedTask>>;
+      const rawTasks = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.tasks)
+          ? parsed.tasks
+          : [];
+
+      const normalizedTasks: GeneratedTask[] = rawTasks
+        .filter((task): task is Partial<GeneratedTask> => Boolean(task?.title))
+        .map((task) => {
+          const priority =
+            task.priority === "high" ||
+            task.priority === "medium" ||
+            task.priority === "low"
+              ? task.priority
+              : "medium";
+
+          return {
+            title: String(task.title ?? "").trim(),
+            priority,
+            date: task.date ?? "",
+          };
+        })
+        .filter((task) => task.title.length > 0);
+
+      setPlanTitle(Array.isArray(parsed) ? "" : (parsed.title ?? ""));
+      setAiTasks(normalizedTasks);
+      const nextUsage = Math.min(MAX_USAGE, usageCount + 1);
+      setUsageCount(nextUsage);
+      if (nextUsage >= MAX_USAGE) {
+        setUsageWarning(
+          "Usage limit reached (5/5). You can't access AI planning now.",
+        );
+      } else {
+        setUsageWarning("");
+      }
     } catch {
-      alert(text);
+      alert("Unable to generate AI plan right now. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const parsed = data as PlanResponse | Array<Partial<GeneratedTask>>;
-    const rawTasks = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray(parsed?.tasks)
-        ? parsed.tasks
-        : [];
-
-    const normalizedTasks: GeneratedTask[] = rawTasks
-      .filter((task): task is Partial<GeneratedTask> => Boolean(task?.title))
-      .map((task) => {
-        const priority =
-          task.priority === "high" ||
-          task.priority === "medium" ||
-          task.priority === "low"
-            ? task.priority
-            : "medium";
-
-        return {
-          title: String(task.title ?? "").trim(),
-          priority,
-          date: task.date ?? "",
-        };
-      })
-      .filter((task) => task.title.length > 0);
-
-    setPlanTitle(Array.isArray(parsed) ? "" : (parsed.title ?? ""));
-    setAiTasks(normalizedTasks);
-    const nextUsage = Math.min(MAX_USAGE, usageCount + 1);
-    setUsageCount(nextUsage);
-    if (nextUsage >= MAX_USAGE) {
-      setUsageWarning(
-        "Usage limit reached (5/5). You can't access AI planning now.",
-      );
-    } else {
-      setUsageWarning("");
-    }
-    setLoading(false);
   };
 
   const convertToTasks = () => {
@@ -239,6 +242,7 @@ export default function AIChat({
     ) : (
       <button
         onClick={handleOpenPlanner}
+        data-tour="ai-open-planner"
         className="group cursor-pointer w-full px-3.5 py-2.5 text-sm flex items-center justify-between gap-2 font-mono tracking-tight transition-all duration-150"
         style={{
           background:
@@ -283,11 +287,20 @@ export default function AIChat({
     );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          setLoading(false);
+        }
+      }}
+    >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
 
       <DialogContent
-        className="sm:max-w-lg p-0 gap-0 rounded-none shadow-none"
+        data-tour="ai-planner-dialog"
+        className="w-[min(94vw,720px)] sm:max-w-[720px] max-h-[88vh] p-0 gap-0 rounded-xl shadow-none overflow-hidden flex flex-col"
         style={{
           background: "var(--color-surface)",
           border: "2px solid var(--color-border)",
@@ -295,7 +308,7 @@ export default function AIChat({
             "6px 6px 0px color-mix(in srgb, var(--color-foreground) 45%, transparent)",
         }}
       >
-        <DialogHeader className="px-6 pt-5 pb-0">
+        <DialogHeader className="px-6 pt-5 pb-0 shrink-0">
           <DialogTitle className="sr-only">AI Planner</DialogTitle>
           {/* Top label bar */}
           <div
@@ -331,7 +344,7 @@ export default function AIChat({
           </div>
         </DialogHeader>
 
-        <div className="px-6 pb-6 flex flex-col gap-4">
+        <div className="px-6 pb-6 flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
           <PromptInput
             prompt={prompt}
             setPrompt={setPrompt}

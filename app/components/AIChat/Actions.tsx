@@ -22,13 +22,15 @@ export default function Actions({
   return (
     <div className="flex gap-4 items-center">
       <Button
+        data-tour="ai-generate-plan"
         onClick={onGenerate}
         disabled={loading || !prompt || usageLimitReached}
         style={{
           background: "var(--color-primary)",
           boxShadow:
             "0 2px 12px color-mix(in srgb, var(--color-primary) 25%, transparent)",
-          cursor: "pointer",
+          cursor:
+            loading || !prompt || usageLimitReached ? "not-allowed" : "pointer",
         }}
       >
         {loading ? "Generating..." : "Generate Plan"}
@@ -36,12 +38,13 @@ export default function Actions({
 
       {hasTasks && (
         <Button
+          data-tour="ai-convert-tasks"
           onClick={onConvert}
           disabled={loading || converted}
           style={{
             background: "var(--color-foreground)",
             color: "var(--color-background)",
-            cursor: "pointer",
+            cursor: loading || converted ? "not-allowed" : "pointer",
           }}
         >
           {converted ? "Added..." : "Convert to Tasks"}

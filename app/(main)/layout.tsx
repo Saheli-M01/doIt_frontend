@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@/app/context/UserContext";
 import AIChat from "@/app/components/AIChat/AIChat";
+import { ProductTour } from "@/app/components/tour/ProductTour";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { ContactModal } from "@/app/components/ContactModal";
@@ -18,6 +19,7 @@ import {
   Menu,
   X,
   Mail,
+  Compass,
 } from "lucide-react";
 import type { Task } from "@/app/components/tasks/types";
 import {
@@ -49,16 +51,24 @@ export default function MainLayout({
     const loadPages = async () => {
       try {
         const backendUserId = await resolveBackendUserId(user);
-        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(
+          /\/$/,
+          "",
+        );
         const res = await fetch(`${baseUrl}/api/task-pages/${backendUserId}`);
         if (!res.ok) throw new Error("Failed to load task pages");
         const pages = await res.json();
-        const normalized = (pages ?? []).map((p: { id: number; name: string }) => ({
-          id: String(p.id),
-          name: p.name,
-        }));
+        const normalized = (pages ?? []).map(
+          (p: { id: number; name: string }) => ({
+            id: String(p.id),
+            name: p.name,
+          }),
+        );
         setTaskPages(normalized);
-        localStorage.setItem(taskNavPagesKey(user.id), JSON.stringify(normalized));
+        localStorage.setItem(
+          taskNavPagesKey(user.id),
+          JSON.stringify(normalized),
+        );
       } catch {
         setTaskPages([]);
       }
@@ -94,30 +104,36 @@ export default function MainLayout({
     window.dispatchEvent(new Event("task-pages-updated"));
   };
 
-  const createTaskPage = async (generatedTasks: Task[] = [], pageName?: string) => {
-
+  const createTaskPage = async (
+    generatedTasks: Task[] = [],
+    pageName?: string,
+  ) => {
     if (!user) return;
     const nextIndex = taskPages.length + 1;
     const finalName = pageName?.trim() || `Task Page ${nextIndex}`;
 
     const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
-
     const backendUserId = await resolveBackendUserId(user);
 
-    const createRes = await fetch(`${baseUrl}/api/task-pages/${backendUserId}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const createRes = await fetch(
+      `${baseUrl}/api/task-pages/${backendUserId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: finalName,
+          sortOrder: 0,
+        }),
       },
-      body: JSON.stringify({
-        name: finalName,
-        sortOrder: 0,
-      }),
-    });
+    );
     if (!createRes.ok) {
       const details = await createRes.text();
-      throw new Error(`Failed to create task page (${createRes.status}): ${details}`);
+      throw new Error(
+        `Failed to create task page (${createRes.status}): ${details}`,
+      );
     }
     const createdPage = await createRes.json();
     const id = String(createdPage?.id ?? "");
@@ -149,7 +165,7 @@ export default function MainLayout({
         ),
       );
     }
-    
+
     router.push(`/tasks/${id}`);
   };
 
@@ -163,7 +179,9 @@ export default function MainLayout({
       });
       if (!deleteRes.ok) {
         const details = await deleteRes.text();
-        throw new Error(`Failed to delete task page (${deleteRes.status}): ${details}`);
+        throw new Error(
+          `Failed to delete task page (${deleteRes.status}): ${details}`,
+        );
       }
     }
 
@@ -209,8 +227,9 @@ export default function MainLayout({
       {/* Sidebar Toggle Button (Mobile) */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={`md:hidden fixed top-4 z-50 p-2 rounded-md bg-surface text-foreground border border-border shadow-sm transition-all duration-300 ease-in-out ${isSidebarOpen ? "left-[15.5rem]" : "left-4"
-          }`}
+        className={`md:hidden fixed top-4 z-50 p-2 rounded-md bg-surface text-foreground border border-border shadow-sm transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? "left-[15.5rem]" : "left-4"
+        }`}
         aria-label="Toggle Sidebar"
       >
         {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
@@ -235,8 +254,10 @@ export default function MainLayout({
         <nav className="flex flex-col gap-1 flex-1">
           <button
             onClick={() => router.push("/dashboard")}
-            className={`cursor-pointer text-left px-4 py-2 rounded transition-colors text-foreground flex items-center gap-2 ${isDashboardActive ? "bg-muted" : "hover:bg-muted"
-              }`}
+            data-tour="nav-dashboard"
+            className={`cursor-pointer text-left px-4 py-2 rounded transition-colors text-foreground flex items-center gap-2 ${
+              isDashboardActive ? "bg-muted" : "hover:bg-muted"
+            }`}
           >
             <LayoutDashboard size={18} />
             Dashboard
@@ -244,8 +265,9 @@ export default function MainLayout({
 
           <div className="flex flex-col gap-1">
             <div
-              className={`px-2 py-1 rounded transition-colors ${isTasksActive ? "bg-muted" : "hover:bg-muted"
-                }`}
+              className={`px-2 py-1 rounded transition-colors ${
+                isTasksActive ? "bg-muted" : "hover:bg-muted"
+              }`}
             >
               <div className="flex items-center justify-between gap-1">
                 <div className="text-left px-2 py-1 rounded text-foreground flex items-center gap-2 flex-1">
@@ -254,6 +276,7 @@ export default function MainLayout({
                 </div>
                 <button
                   onClick={() => createTaskPage()}
+                  data-tour="create-task-page"
                   className="cursor-pointer p-1 rounded text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
                   aria-label="Create task page"
                 >
@@ -267,10 +290,11 @@ export default function MainLayout({
                 {taskPages.map((page) => (
                   <div
                     key={page.id}
-                    className={`group flex items-center justify-between rounded px-2 py-1 ${pathname === `/tasks/${page.id}`
+                    className={`group flex items-center justify-between rounded px-2 py-1 ${
+                      pathname === `/tasks/${page.id}`
                         ? "bg-muted"
                         : "hover:bg-muted/60"
-                      }`}
+                    }`}
                   >
                     <button
                       onClick={() => router.push(`/tasks/${page.id}`)}
@@ -292,7 +316,7 @@ export default function MainLayout({
           </div>
         </nav>
 
-        <div className="pb-2 ">
+        <div className="pb-2" data-tour="ai-planner-entry">
           <AIChat
             userId={String(user.id)}
             mode="sidebar"
@@ -311,6 +335,24 @@ export default function MainLayout({
         </div>
 
         <button
+          type="button"
+          onClick={() => {
+            if (pathname.startsWith("/tasks")) {
+              window.dispatchEvent(new Event("doit:start-tour"));
+              return;
+            }
+
+            sessionStorage.setItem("doit-product-tour-pending", "1");
+            const firstPageId = taskPages[0]?.id;
+            router.push(firstPageId ? `/tasks/${firstPageId}` : "/tasks");
+          }}
+          className="px-4 py-2 rounded text-primary hover:bg-muted transition-colors text-left flex items-center gap-2 text-sm border border-primary/25 bg-primary/10"
+        >
+          <Compass size={16} />
+          Start Product Tour
+        </button>
+
+        <button
           onClick={() => setContactOpen(true)}
           className="px-4 py-2 rounded text-foreground-muted hover:bg-muted hover:text-foreground transition-colors text-left flex items-center gap-2 text-sm"
         >
@@ -325,14 +367,14 @@ export default function MainLayout({
           <LogOut size={18} />
           Logout
         </button>
-
-        
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 w-full h-screen overflow-y-auto bg-background text-foreground relative">
         <div className="p-4 md:p-6 mt-14 md:mt-0 max-w-full">{children}</div>
       </main>
+
+      <ProductTour />
     </div>
   );
 }

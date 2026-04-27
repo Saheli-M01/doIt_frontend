@@ -591,12 +591,13 @@ export default function TasksPage() {
           )}
         </div>
         {/* ── Add Task ── */}
-        <Card style={{ marginBottom: 20 }}>
+        <Card style={{ marginBottom: 20 }} data-tour="new-task-card">
           <div className="flex gap-2.5 flex-wrap items-center">
             <p className="text-[11px] font-bold uppercase tracking-widest text-foreground-muted whitespace-nowrap">
               New Task
             </p>
             <Input
+              data-tour="new-task-input"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addTask()}
@@ -615,7 +616,11 @@ export default function TasksPage() {
               placeholder="Priority"
               style={{ minWidth: 138 }}
             />
-            <Button onClick={addTask} disabled={!title.trim() || isAdding}>
+            <Button
+              data-tour="add-task-button"
+              onClick={addTask}
+              disabled={!title.trim() || isAdding}
+            >
               {isAdding ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
