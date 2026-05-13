@@ -64,24 +64,36 @@ export default function LoginPage() {
             elements: {
               rootBox: "w-full max-w-sm mx-auto",
               card: isDark
-                ? "shadow-2xl border border-white/10"
-                : "shadow-xl border border-zinc-200",
+                ? "!overflow-visible shadow-2xl border border-white/10"
+                : "!overflow-visible shadow-xl border border-zinc-200",
               formButtonPrimary:
                 "bg-gradient-to-r from-[#005087] to-[#4a90e2] hover:opacity-90 transition-opacity font-semibold",
               footer: "hidden",
               otpCodeFieldInput: isDark
                 ? "!bg-[#28282e] !text-white !border-white/20 text-xl font-bold"
                 : "!bg-white !text-zinc-900 !border-zinc-200 text-xl font-bold",
+              formFieldLabel: isDark ? "!text-zinc-200" : "!text-zinc-700",
+              headerTitle: isDark ? "!text-white" : "!text-zinc-900",
+              headerSubtitle: isDark ? "!text-zinc-400" : "!text-zinc-500",
+              socialButtonsBlockButtonText: isDark ? "!text-white" : "!text-zinc-900",
+              formFieldInput: isDark
+                ? "!bg-[#28282e] !text-white !border-white/10 placeholder:!text-zinc-500"
+                : "!bg-white !text-zinc-900 !border-zinc-200",
+              formFieldInputShowPasswordButton: isDark
+                ? "!text-zinc-400 hover:!text-white"
+                : "!text-zinc-500 hover:!text-zinc-900",
+              identityPreviewText: isDark ? "!text-white" : "!text-zinc-900",
+              identityPreviewEditButton: isDark ? "!text-zinc-400" : "!text-zinc-600",
+              dividerText: isDark ? "!text-zinc-500" : "!text-zinc-400",
+              socialButtonsBlockButton: isDark
+                ? "!border-white/10 !bg-[#232329] hover:!bg-[#2a2a31] !text-white"
+                : "!border-zinc-200 !bg-white hover:!bg-zinc-50 !text-zinc-900",
+              socialButtonsBlockButtonArrow: isDark ? "!text-zinc-400" : "!text-zinc-500",
+             
             },
           }}
         />
       </main>
-
-      <footer className="border-t border-border">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-center text-xs text-foreground-muted">
-          © {new Date().getFullYear()} DoIt. All rights reserved.
-        </div>
-      </footer>
     </div>
   );
 }
