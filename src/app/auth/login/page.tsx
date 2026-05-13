@@ -3,17 +3,26 @@
 import { SignIn } from "@clerk/nextjs";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
+import { useTheme } from "@/app/context/ThemeContext";
 import Link from "next/link";
 
 export default function LoginPage() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
+    <div
+      className="flex flex-col min-h-screen text-foreground"
+      style={{
+        background: isDark
+          ? "radial-gradient(ellipse at 60% 0%, rgba(90,159,237,0.12) 0%, transparent 60%), #0a0a0a"
+          : "radial-gradient(ellipse at 60% 0%, rgba(74,144,226,0.08) 0%, transparent 60%), #f4f6f9",
+      }}
+    >
       {/* Nav */}
-      <header className="w-full border-b border-border">
+      <header className="w-full border-b border-border bg-background/60 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/">
-            <ThemedLogo />
-          </Link>
+          <Link href="/"><ThemedLogo /></Link>
           <ThemeToggle />
         </div>
       </header>
@@ -23,25 +32,46 @@ export default function LoginPage() {
           routing="hash"
           fallbackRedirectUrl="/dashboard"
           appearance={{
+            variables: isDark
+              ? {
+                  colorBackground: "#1e1e22",
+                  colorInputBackground: "#28282e",
+                  colorText: "#f0f0f0",
+                  colorTextSecondary: "#9a9aaa",
+                  colorTextOnPrimaryBackground: "#ffffff",
+                  colorInputText: "#f0f0f0",
+                  colorPrimary: "#4a90e2",
+                  colorDanger: "#e74c3c",
+                  colorNeutral: "#f0f0f0",
+                  borderRadius: "12px",
+                  fontFamily: "inherit",
+                  fontSize: "14px",
+                }
+              : {
+                  colorBackground: "#ffffff",
+                  colorInputBackground: "#f8f9fa",
+                  colorText: "#0b0b0f",
+                  colorTextSecondary: "#6c757d",
+                  colorTextOnPrimaryBackground: "#ffffff",
+                  colorInputText: "#0b0b0f",
+                  colorPrimary: "#4a90e2",
+                  colorDanger: "#dc3545",
+                  colorNeutral: "#0b0b0f",
+                  borderRadius: "12px",
+                  fontFamily: "inherit",
+                  fontSize: "14px",
+                },
             elements: {
-              rootBox: "w-full max-w-sm",
-              card: "bg-surface border border-border shadow-none rounded-xl p-6",
-              headerTitle: "text-foreground text-2xl font-bold",
-              headerSubtitle: "text-foreground-muted text-sm",
-              socialButtonsBlockButton:
-                "border border-border bg-surface hover:bg-muted text-foreground text-sm font-medium rounded-lg",
-              formFieldLabel: "text-foreground text-sm font-medium",
-              formFieldInput:
-                "bg-surface border border-border text-foreground placeholder:text-foreground-muted rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary",
+              rootBox: "w-full max-w-sm mx-auto",
+              card: isDark
+                ? "shadow-2xl border border-white/10"
+                : "shadow-xl border border-zinc-200",
               formButtonPrimary:
-                "bg-primary hover:bg-primary-dark text-white font-semibold text-sm rounded-lg",
-              footerActionLink: "text-primary hover:text-primary-dark font-medium",
-              // Hide the "Don't have an account? Sign up" footer
+                "bg-gradient-to-r from-[#005087] to-[#4a90e2] hover:opacity-90 transition-opacity font-semibold",
               footer: "hidden",
-              identityPreviewText: "text-foreground",
-              identityPreviewEditButton: "text-primary",
-              dividerLine: "bg-border",
-              dividerText: "text-foreground-muted text-xs",
+              otpCodeFieldInput: isDark
+                ? "!bg-[#28282e] !text-white !border-white/20 text-xl font-bold"
+                : "!bg-white !text-zinc-900 !border-zinc-200 text-xl font-bold",
             },
           }}
         />

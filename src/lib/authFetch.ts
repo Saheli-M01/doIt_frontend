@@ -3,22 +3,20 @@
 /**
  * Wrapper around fetch that automatically attaches the Clerk JWT token
  * as an Authorization: Bearer header.
- *
- * Usage (inside a component or hook where useAuth is available):
- *   import { useAuth } from "@clerk/nextjs";
- *   const { getToken } = useAuth();
- *   const res = await authFetch(getToken, "/api/tasks/1");
  */
 export async function authFetch(
-  getToken: () => Promise<string | null>,
+  getToken: (options?: { template?: string }) => Promise<string | null>,
   input: RequestInfo | URL,
   init: RequestInit = {}
 ): Promise<Response> {
+  // Get the raw JWT — no template needed, default Clerk session token works
   const token = await getToken();
 
   const headers = new Headers(init.headers ?? {});
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
+  } else {
+    console.warn("authFetch: no token available for", input);
   }
 
   return fetch(input, { ...init, headers });
