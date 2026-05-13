@@ -3,12 +3,13 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@/app/context/UserContext";
-import { useClerk } from "@clerk/nextjs";
+import { useClerk, useAuth } from "@clerk/nextjs";
 import AIChat from "@/app/components/AIChat/AIChat";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { ThemedLogo } from "@/app/components/ThemedLogo";
 import { ContactModal } from "@/app/components/ContactModal";
 import { resolveBackendUserId } from "@/lib/backendUser";
+import { authFetch } from "@/lib/authFetch";
 import { DeleteConfirmDialog } from "@/app/components/DeleteConfirmDialog";
 
 import Link from "next/link";
@@ -21,7 +22,6 @@ import {
   Menu,
   X,
   Mail,
-  Compass,
 } from "lucide-react";
 import {
   taskNavPagesKey,
@@ -51,6 +51,7 @@ export default function MainLayout({
   const pathname = usePathname();
   const { user, isLoading } = useUser();
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
   const [taskPages, setTaskPages] = useState<TaskNavPage[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
@@ -70,7 +71,7 @@ export default function MainLayout({
           /\/$/,
           "",
         );
-        const res = await fetch(`${baseUrl}/api/task-pages/${backendUserId}`);
+        const res = await authFetch(getToken, `${baseUrl}/api/task-pages/${backendUserId}`);
         if (!res.ok) throw new Error("Failed to load task pages");
         const pages = await res.json();
         const normalized = (pages ?? []).map(
@@ -126,7 +127,7 @@ export default function MainLayout({
 
     const backendUserId = await resolveBackendUserId(user);
 
-    const createRes = await fetch(
+    const createRes = await authFetch(getToken,
       `${baseUrl}/api/task-pages/${backendUserId}`,
       {
         method: "POST",
@@ -160,7 +161,7 @@ export default function MainLayout({
       const today = new Date().toISOString().split("T")[0];
       await Promise.all(
         generatedTasks.map((task) =>
-          fetch(`${baseUrl}/api/tasks/${backendUserId}`, {
+          authFetch(getToken, `${baseUrl}/api/tasks/${backendUserId}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -181,7 +182,7 @@ export default function MainLayout({
 
   const deleteTaskPage = async (pageId: string) => {
     if (!user) return;
-    
+
     const page = taskPages.find((p) => p.id === pageId);
     setDeletePageDialog({
       open: true,
@@ -193,11 +194,11 @@ export default function MainLayout({
   const confirmDeleteTaskPage = async () => {
     const pageId = deletePageDialog.pageId;
     if (!pageId || !user) return;
-    
+
     const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
     if (/^\d+$/.test(pageId)) {
-      const deleteRes = await fetch(`${baseUrl}/api/task-pages/${pageId}`, {
+      const deleteRes = await authFetch(getToken, `${baseUrl}/api/task-pages/${pageId}`, {
         method: "DELETE",
       });
       if (!deleteRes.ok) {
@@ -357,8 +358,6 @@ export default function MainLayout({
           />
         </div>
 
-       
-
         <button
           onClick={() => setContactOpen(true)}
           className="px-4 py-2 rounded text-foreground-muted hover:bg-muted hover:text-foreground transition-colors text-left flex items-center gap-2 text-sm"
@@ -380,8 +379,6 @@ export default function MainLayout({
       <main className="flex-1 w-full h-screen overflow-y-auto bg-background text-foreground relative">
         <div className="p-4 md:p-6 mt-14 md:mt-0 max-w-full">{children}</div>
       </main>
-
-
 
       {/* Delete Task Page Confirmation */}
       <DeleteConfirmDialog
